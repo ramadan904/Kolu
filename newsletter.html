@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devpost Weekly Newsletter Summary</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151c;
+    --panel-border: #23283333;
+    --border: #232833;
+    --text: #e8eaf0;
+    --muted: #9aa3b2;
+    --accent: #7c5cff;
+    --accent-soft: #7c5cff22;
+    --chip-bg: #1a1f2b;
+    --link: #9d8bff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --border: #e3e6ee;
+      --text: #1a1d27;
+      --muted: #5c6474;
+      --accent: #5b3df0;
+      --accent-soft: #5b3df01a;
+      --chip-bg: #f0eeff;
+      --link: #5b3df0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 16px 80px;
+  }
+  header.page-header {
+    padding: 8px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  header.page-header .eyebrow {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header.page-header h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  header.page-header p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 15px;
+  }
+  section {
+    margin-bottom: 40px;
+  }
+  section > h2 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section > h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+  }
+  .card h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+  .card .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 12px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--chip-bg);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .card .creators {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin: 0 0 10px;
+  }
+  .card p.desc {
+    margin: 0 0 14px;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .card .deadline {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin: 4px 0;
+  }
+  .card .prize {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    margin: 4px 0;
+  }
+  a.btn {
+    display: inline-block;
+    margin-top: 4px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+  }
+  a.btn:hover { opacity: 0.9; }
+  a.link {
+    color: var(--link);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+  a.link:hover { text-decoration: underline; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .badge-winner {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  footer {
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-header">
+    <div class="eyebrow">Devpost · Weekly Newsletter</div>
+    <h1>Devpost Weekly Newsletter Summary</h1>
+    <p>Winner spotlights, builder resources, and the hackathons worth your time this week.</p>
+  </header>
+
+  <section>
+    <h2>Winner Spotlights</h2>
+
+    <div class="card">
+      <span class="chip badge-winner">🏆 Grand Prize · Build with DataHub</span>
+      <h3>Project Blackbox</h3>
+      <p class="creators">by Alex Velazquez</p>
+      <p class="desc">An autonomous data incident response agent. It takes plain-English anomaly reports, traces them back to their root cause using DataHub lineage, automatically repairs the broken code, and opens a pull request that includes machine-verified proof of the fix.</p>
+      <a class="link" href="#">View Project on Devpost →</a>
+    </div>
+
+    <div class="card">
+      <span class="chip badge-winner">🏆 Overall Winner · ARM Create</span>
+      <h3>Literally the Smallest 0.5B Param Functional LLM ever built</h3>
+      <p class="creators">by Bitan Nath and Swati Ram</p>
+      <p class="desc">A 0.5 billion parameter LLM that runs at ~3 tokens per second on an Apple Watch using only 64 MB of peak RAM. Built in Zig using ARM NEON SIMD instructions and memory mapping (mmap) — the first publicly working multi-turn conversation LLM on wearable hardware, including a mood-uplifting agent demo.</p>
+      <a class="link" href="#">View Project on Devpost →</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Resources &amp; Programs</h2>
+    <div class="card">
+      <h3>Nebius AI Builder Program</h3>
+      <p class="desc">Free for anyone interested. Gives developers a strong head start, especially those competing in the Nebius × NVIDIA Global AI Hackathon.</p>
+      <ul style="margin: 0 0 14px; padding-left: 20px; color: var(--muted); font-size: 14px;">
+        <li>$25 in Token Factory inference credits</li>
+        <li>$125+ in partner stack offers (Tavily, LangSmith, Toloka)</li>
+        <li>Runnable cookbooks</li>
+        <li>H100 GPU access</li>
+      </ul>
+      <a class="btn" href="#">Apply to the Builder Program</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Featured Hackathons</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Nebius x NVIDIA Global AI Hackathon</h3>
+        <p class="prize">$50,000 cash + NVIDIA Jetson Orin Nanos for track winners</p>
+        <p class="deadline">Deadline: October 30, 2026</p>
+        <p class="desc">Build any AI system you'd actually use — coding agents, personal assistants, or physical AI. Powered by NVIDIA open-source models on Nebius Token Factory, across four tracks. A live build-session recording is available.</p>
+        <a class="btn" href="#">Register + Watch Recording</a>
+      </div>
+      <div class="card">
+        <h3>Build, Ship, Shape: Amazon Developer Hackathon</h3>
+        <p class="prize">$138,000 in cash</p>
+        <p class="deadline">Deadline: October 23, 2026</p>
+        <p class="desc">Organized by Amazon.</p>
+        <a class="btn" href="#">Register</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Trending This Week</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>RevenueCat Shipaton 2026</h3>
+        <p class="prize">$740,000+ in prizes</p>
+        <p class="deadline">Deadline: September 30, 2026 (closing very soon)</p>
+        <a class="btn" href="#">Start your submission today</a>
+      </div>
+      <div class="card">
+        <h3>OpenCV AI Competition 2026, powered by AWS</h3>
+        <p class="prize">$20,250 in cash</p>
+        <p class="deadline">Deadline: October 26, 2026</p>
+        <a class="btn" href="#">Register</a>
+      </div>
+      <div class="card">
+        <h3>AWS CDS Agentic AI Partner Hackathon</h3>
+        <p class="prize">$40,000 in cash</p>
+        <p class="deadline">Deadline: October 28, 2026</p>
+        <a class="btn" href="#">Register</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Devpost Weekly Newsletter Summary — compiled for Kolu
+  </footer>
+
+</div>
+</body>
+</html>
