@@ -1,0 +1,136 @@
+/**
+ * Jupiter quote adapter — turns an assumed price impact into a measured one.
+ *
+ * The edge panel's default is a slider you set yourself, which is honest but
+ * soft: the number that actually decides a trade is what the router says it
+ * will cost to move your size right now. This asks.
+ *
+ * It is deliberately quote-only. Kolu does not build, sign or send a
+ * transaction, and holds no key material.
+ */
+
+import { PriceSourceError } from "./types";
+
+const DEFAULT_ENDPOINT = "https://lite-api.jup.ag";
+
+export interface QuoteRequest {
+  inputMint: string;
+  outputMint: string;
+  /** Integer base units of the input mint. */
+  amount: bigint;
+  slippageBps?: number;
+}
+
+export interface RouteQuote {
+  inAmount: bigint;
+  outAmount: bigint;
+  /** Price impact in bps, converted from Jupiter's decimal fraction. */
+  priceImpactBps: number;
+  /** AMMs the route passes through, for display. */
+  route: string[];
+}
+
+export interface QuoteSource {
+  getQuote(request: QuoteRequest): Promise<RouteQuote>;
+}
+
+function asRecord(value: unknown, context: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    throw new PriceSourceError(`${context}: expected an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+/** Jupiter returns amounts as decimal strings that can exceed Number.MAX_SAFE_INTEGER. */
+function asBigInt(value: unknown, context: string): bigint {
+  if (typeof value === "number" && Number.isInteger(value)) return BigInt(value);
+  if (typeof value === "string" && /^\d+$/.test(value)) return BigInt(value);
+  throw new PriceSourceError(`${context}: expected an integer amount, got ${String(value)}`);
+}
+
+export class JupiterSource implements QuoteSource {
+  private readonly endpoint: string;
+  private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+
+  constructor(
+    options: { endpoint?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+  ) {
+    this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 8000;
+  }
+
+  async getQuote(request: QuoteRequest): Promise<RouteQuote> {
+    if (request.amount <= 0n) {
+      throw new PriceSourceError("Quote amount must be positive");
+    }
+
+    const params = new URLSearchParams({
+      inputMint: request.inputMint,
+      outputMint: request.outputMint,
+      amount: request.amount.toString(),
+      slippageBps: String(request.slippageBps ?? 50),
+    });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    let body: unknown;
+    try {
+      const res = await this.fetchImpl(`${this.endpoint}/swap/v1/quote?${params}`, {
+        signal: controller.signal,
+        headers: { accept: "application/json" },
+      });
+      if (!res.ok) {
+        throw new PriceSourceError(`Jupiter quote returned ${res.status}`);
+      }
+      body = await res.json();
+    } catch (err) {
+      if (err instanceof PriceSourceError) throw err;
+      throw new PriceSourceError("Jupiter quote request failed", err);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const rec = asRecord(body, "Jupiter quote");
+
+    // priceImpactPct is a decimal fraction ("0.0023" = 23bps), not a percentage.
+    // Reading it as a percentage understates impact by 100x, which would turn
+    // every unprofitable trade on the board into a profitable-looking one.
+    const rawImpact = rec.priceImpactPct;
+    const impact =
+      typeof rawImpact === "string" ? Number(rawImpact) : typeof rawImpact === "number" ? rawImpact : NaN;
+    if (!Number.isFinite(impact)) {
+      throw new PriceSourceError("Jupiter quote: priceImpactPct was not a number");
+    }
+
+    const routePlan = Array.isArray(rec.routePlan) ? rec.routePlan : [];
+    const route = routePlan
+      .map((leg) => {
+        const info = asRecord(leg, "route leg").swapInfo;
+        const label = typeof info === "object" && info !== null
+          ? (info as Record<string, unknown>).label
+          : null;
+        return typeof label === "string" ? label : null;
+      })
+      .filter((label): label is string => label !== null);
+
+    return {
+      inAmount: asBigInt(rec.inAmount, "Jupiter quote inAmount"),
+      outAmount: asBigInt(rec.outAmount, "Jupiter quote outAmount"),
+      priceImpactBps: Math.abs(impact) * 10_000,
+      route,
+    };
+  }
+}
+
+/** Converts a USD notional into integer base units of the quote mint. */
+export function toBaseUnits(notionalUsd: number, decimals: number): bigint {
+  if (!Number.isFinite(notionalUsd) || notionalUsd <= 0) {
+    throw new PriceSourceError(`Invalid notional: ${notionalUsd}`);
+  }
+  // Via string to avoid float error creeping into the integer amount.
+  const scaled = (notionalUsd * 10 ** decimals).toFixed(0);
+  return BigInt(scaled);
+}

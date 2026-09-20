@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { HistoryPoint, HistorySeries } from "@/lib/history";
+import { niceDomain } from "@/lib/chart-scale";
 import { fmtBps } from "@/lib/format";
 import { SESSION_COPY } from "@/lib/market/session";
 
@@ -46,7 +47,7 @@ export function BasisChart({ series }: { series: HistorySeries }) {
     const t1 = pts[pts.length - 1].t;
     const span = Math.max(t1 - t0, 1);
     const maxAbs = Math.max(25, ...pts.map((p) => Math.abs(p.basisBps)));
-    const dom = maxAbs * 1.15;
+    const dom = niceDomain(maxAbs * 1.08);
 
     const xOf = (t: number) => PAD.left + ((t - t0) / span) * PLOT_W;
     const yOf = (bps: number) => PAD.top + PLOT_H / 2 - (bps / dom) * (PLOT_H / 2);

@@ -124,3 +124,14 @@ describe("seriesFor", () => {
     expect(series.points).toHaveLength(0);
   });
 });
+
+describe("niceDomain", () => {
+  it("rounds to readable axis bounds", async () => {
+    const { niceDomain } = await import("@/lib/chart-scale");
+    expect(niceDomain(187)).toBe(200);
+    expect(niceDomain(201)).toBe(250);
+    expect(niceDomain(12)).toBe(25);
+    // Beyond the table, fall back to the next round hundred.
+    expect(niceDomain(742)).toBe(800);
+  });
+});

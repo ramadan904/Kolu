@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "Copy to config/mints.json and fill in addresses you have verified yourself.",
+    "Until this exists, Kolu's execution path stays disabled and the edge panel",
+    "uses your assumed price impact instead of a measured route quote.",
+    "A wrong mint does not error — it routes an order into the wrong asset."
+  ],
+  "quote": { "mint": "<USDC mint address>", "decimals": 6 },
+  "tokens": {
+    "TSLA": { "mint": "<TSLAx mint address>", "decimals": 8 },
+    "NVDA": { "mint": "<NVDAx mint address>", "decimals": 8 },
+    "SPY": { "mint": "<SPYx mint address>", "decimals": 8 },
+    "AAPL": { "mint": "<AAPLx mint address>", "decimals": 8 },
+    "QQQ": { "mint": "<QQQx mint address>", "decimals": 8 }
+  }
+}

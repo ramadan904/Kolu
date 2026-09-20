@@ -1,11 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BasisReading } from "@/lib/basis/compute";
 import { computeEdge, DEFAULT_COSTS } from "@/lib/basis/edge";
 import { fmtBps, fmtUsd } from "@/lib/format";
 
 const SIZES = [1_000, 10_000, 50_000, 250_000];
+
+interface QuoteState {
+  status: "idle" | "loading" | "measured" | "unavailable";
+  priceImpactBps: number | null;
+  route: string[];
+  detail: string | null;
+}
+
+const IDLE: QuoteState = { status: "idle", priceImpactBps: null, route: [], detail: null };
 
 /**
  * The action surface. A gap is only interesting next to what it costs to touch
@@ -14,9 +23,65 @@ const SIZES = [1_000, 10_000, 50_000, 250_000];
  */
 export function EdgePanel({ reading }: { reading: BasisReading }) {
   const [notional, setNotional] = useState(10_000);
-  const [impactBps, setImpactBps] = useState(DEFAULT_COSTS.priceImpactBps);
+  const [assumedBps, setAssumedBps] = useState(DEFAULT_COSTS.priceImpactBps);
+  const [quote, setQuote] = useState<QuoteState>(IDLE);
 
   const hedgeable = reading.referenceQuality === "live";
+
+  // A measured route beats an assumption, so it wins whenever one is available.
+  const impactBps = quote.status === "measured" && quote.priceImpactBps !== null
+    ? quote.priceImpactBps
+    : assumedBps;
+
+  // Debounced: dragging through the size presets should not fire a request per
+  // keystroke, and the quote is only meaningful for the size you settle on.
+  useEffect(() => {
+    let cancelled = false;
+    setQuote((prev) => ({ ...prev, status: "loading" }));
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/quote?ticker=${reading.ticker}&notional=${notional}`,
+            { cache: "no-store" },
+          );
+          const body = await res.json();
+          if (cancelled) return;
+
+          if (body.available) {
+            setQuote({
+              status: "measured",
+              priceImpactBps: Number(body.priceImpactBps),
+              route: Array.isArray(body.route) ? body.route : [],
+              detail: null,
+            });
+          } else {
+            setQuote({
+              status: "unavailable",
+              priceImpactBps: null,
+              route: [],
+              detail: typeof body.detail === "string" ? body.detail : null,
+            });
+          }
+        } catch {
+          if (!cancelled) {
+            setQuote({
+              status: "unavailable",
+              priceImpactBps: null,
+              route: [],
+              detail: "The quote service could not be reached.",
+            });
+          }
+        }
+      })();
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [reading.ticker, notional]);
 
   const edge = useMemo(() => {
     if (reading.basisBps === null) return null;
@@ -83,28 +148,54 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
           />
         </div>
 
-        <div>
-          <label
-            className="block text-xs font-medium uppercase tracking-wide"
-            style={{ color: "var(--text-muted)" }}
-            htmlFor={`impact-${reading.ticker}`}
-          >
-            Assumed price impact — {impactBps}bps per leg
-          </label>
-          <input
-            id={`impact-${reading.ticker}`}
-            type="range"
-            min={0}
-            max={120}
-            value={impactBps}
-            onChange={(e) => setImpactBps(Number(e.target.value))}
-            className="mt-2 w-full"
-          />
-          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Replace with a live route quote before trading. Until then this is your
-            assumption, not a measurement.
-          </p>
-        </div>
+        {quote.status === "measured" ? (
+          <div>
+            <div
+              className="text-xs font-medium uppercase tracking-wide"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Measured price impact
+            </div>
+            <div className="mt-1 text-lg font-semibold tnum">
+              {impactBps.toFixed(1)}bps
+              <span
+                className="ml-2 text-xs font-normal"
+                style={{ color: "var(--status-good)" }}
+              >
+                ● live route
+              </span>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              {quote.route.length
+                ? `Routed through ${quote.route.join(" → ")} for this size.`
+                : "Quoted for this size."}
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label
+              className="block text-xs font-medium uppercase tracking-wide"
+              style={{ color: "var(--text-muted)" }}
+              htmlFor={`impact-${reading.ticker}`}
+            >
+              Assumed price impact — {assumedBps}bps per leg
+            </label>
+            <input
+              id={`impact-${reading.ticker}`}
+              type="range"
+              min={0}
+              max={120}
+              value={assumedBps}
+              onChange={(e) => setAssumedBps(Number(e.target.value))}
+              className="mt-2 w-full"
+            />
+            <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              {quote.status === "loading"
+                ? "Asking the router for a quote at this size…"
+                : `This is your assumption, not a measurement.${quote.detail ? ` ${quote.detail}` : ""}`}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
