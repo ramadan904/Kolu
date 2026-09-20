@@ -93,10 +93,14 @@ unlabelled.
       confidence band around zero. A greyed row's bar sits inside that band.
 - [ ] Polarity is never colour-only — every basis cell also shows a signed
       number (`+1.73%` / `−1.10%`).
-- [ ] **History chart.** Expand a row. Shaded regions = market shut. On a
-      weekend the line should be **flat near zero through the session, then
-      opening across the closure** — if it is inverted (huge and shrinking),
-      that is a regression.
+- [ ] **History chart.** Expand a row. Shaded regions = market shut. The line
+      should be **flat near zero through the session, then opening across the
+      closure** — if it is inverted (huge and shrinking), that is a regression.
+- [ ] **Modelled and observed are visually distinct.** The 48h shape is dashed
+      and dimmed with a "modelled" legend. Leave the tab open for a few minutes
+      and genuinely observed readings draw over it as a solid line, with the
+      caption switching to "N readings observed in this browser". The two must
+      never be indistinguishable.
 - [ ] **Action surface.** Change size ($1k → $250k). Costs recompute. Network
       fee in bps shrinks as size grows.
 - [ ] **Directional is never green.** On a closed market the Net edge figure

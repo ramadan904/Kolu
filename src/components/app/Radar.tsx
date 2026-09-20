@@ -13,6 +13,7 @@ import {
   type AlertRule,
 } from "@/lib/alerts";
 import { AlertControl, ArmedStrip } from "./Alerts";
+import { observed as observedHistory, record as recordHistory } from "@/lib/client-history";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AssetList } from "./AssetList";
@@ -31,6 +32,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [stale, setStale] = useState(false);
   const [mints, setMints] = useState<MintMap | null>(null);
+  const [observed, setObserved] = useState<{ t: number; basisBps: number }[]>([]);
   const [fired, setFired] = useState<AlertHit[]>([]);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
@@ -113,6 +115,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         setBoard(snapshot);
         setStale(false);
         applyRules(snapshot);
+
+        // Recorded in the browser because a serverless process cannot hold
+        // history: every request may land on a fresh instance.
+        for (const r of snapshot.readings) {
+          if (r.basisBps !== null) recordHistory(r.ticker, r.basisBps);
+        }
       } catch {
         setStale(true);
       }
@@ -144,7 +152,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         const res = await fetch(`/api/history?ticker=${selected}`, { cache: "no-store" });
         if (!res.ok) throw new Error();
         const series = (await res.json()) as HistorySeries;
-        if (!cancelled) setHistory(series);
+        if (!cancelled) {
+          setHistory(series);
+          setObserved(observedHistory(selected));
+        }
       } catch {
         if (!cancelled) setHistory(null);
       }
@@ -279,7 +290,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
           {history && (
             <div className="mt-5">
-              <BasisChart series={history} />
+              <BasisChart series={history} observed={observed} />
             </div>
           )}
 

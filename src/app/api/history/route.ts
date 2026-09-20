@@ -19,11 +19,15 @@ export async function GET(request: Request) {
     // the right edge of the chart always matches the row that opened it.
     const board = await buildBoard({ tier: "all" });
     const reading = board.readings.find((r) => r.ticker === entry.ticker);
+    // Always modelled, whatever the price source. Real history cannot live in
+    // a serverless process — each request may land on a fresh instance — so
+    // this is context for the shape, and the client supplies what it has
+    // genuinely observed. The chart draws the two differently.
     const series = seriesFor(
       entry.ticker,
       reading?.basisBps ?? null,
       new Date(board.generatedAt),
-      board.source === "fixture",
+      true,
     );
     return NextResponse.json(series, { headers: { "cache-control": "no-store" } });
   } catch (err) {

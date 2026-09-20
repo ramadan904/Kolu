@@ -21,7 +21,14 @@ const SHUT = new Set(["closed", "weekend", "holiday"]);
  * while the underlying can be traded, opens once it cannot, and collapses at
  * the next open.
  */
-export function BasisChart({ series }: { series: HistorySeries }) {
+export function BasisChart({
+  series,
+  observed = [],
+}: {
+  series: HistorySeries;
+  /** Points this browser actually saw the board return. */
+  observed?: { t: number; basisBps: number }[];
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
@@ -31,7 +38,10 @@ export function BasisChart({ series }: { series: HistorySeries }) {
 
     const t0 = pts[0].t;
     const span = Math.max(pts[pts.length - 1].t - t0, 1);
-    const dom = basisDomain(pts.map((p) => p.basisBps));
+    const dom = basisDomain([
+      ...pts.map((p) => p.basisBps),
+      ...observed.map((p) => p.basisBps),
+    ]);
     const range = Math.max(dom.max - dom.min, 1);
 
     const x = (t: number) => PAD.left + ((t - t0) / span) * PLOT_W;
@@ -54,8 +64,20 @@ export function BasisChart({ series }: { series: HistorySeries }) {
       }
     });
 
-    return { pts, x, y, line, bands, dom };
-  }, [series.points]);
+    // Only points inside the modelled window can be plotted against it.
+    const seen = observed.filter((p) => p.t >= t0);
+    const observedLine =
+      seen.length >= 2
+        ? seen
+            .map(
+              (p, i) =>
+                `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(p.basisBps).toFixed(1)}`,
+            )
+            .join(" ")
+        : null;
+
+    return { pts, x, y, line, bands, dom, observedLine, seenCount: seen.length };
+  }, [series.points, observed]);
 
   if (!model) {
     return (
@@ -67,7 +89,7 @@ export function BasisChart({ series }: { series: HistorySeries }) {
     );
   }
 
-  const { pts, x, y, line, bands, dom } = model;
+  const { pts, x, y, line, bands, dom, observedLine, seenCount } = model;
   const last = pts[pts.length - 1];
   const stroke = last.basisBps < 0 ? "var(--down)" : "var(--up)";
   const active = hover === null ? null : pts[hover];
@@ -96,8 +118,25 @@ export function BasisChart({ series }: { series: HistorySeries }) {
   return (
     <figure className="m-0">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-          48 hours · shaded when the market was shut
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+          <span>48 hours · shaded when the market was shut</span>
+          <span className="flex items-center gap-1.5 normal-case tracking-normal">
+            <svg width="14" height="6" aria-hidden="true">
+              <line
+                x1="0" y1="3" x2="14" y2="3"
+                stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2"
+              />
+            </svg>
+            modelled
+          </span>
+          {seenCount >= 2 && (
+            <span className="flex items-center gap-1.5 normal-case tracking-normal">
+              <svg width="14" height="6" aria-hidden="true">
+                <line x1="0" y1="3" x2="14" y2="3" stroke={stroke} strokeWidth="2" />
+              </svg>
+              observed here
+            </span>
+          )}
         </span>
         <span className="num text-[12px] text-[var(--text-2)]" aria-live="polite">
           {active
@@ -108,9 +147,9 @@ export function BasisChart({ series }: { series: HistorySeries }) {
                 minute: "2-digit",
                 hour12: false,
               })} ET · ${fmtBps(active.basisBps, 1)} · ${SESSION_COPY[active.phase]}`
-            : series.synthetic
-              ? "Modelled history"
-              : ""}
+            : seenCount >= 2
+              ? `${seenCount} readings observed in this browser`
+              : "Modelled shape — real readings appear as you watch"}
         </span>
       </div>
 
@@ -158,15 +197,31 @@ export function BasisChart({ series }: { series: HistorySeries }) {
           </g>
         ))}
 
+        {/* Modelled context: dashed and dimmed, so it cannot be mistaken for
+            a reading anyone took. */}
         <path
           d={line}
           fill="none"
           stroke={stroke}
-          strokeWidth={1.75}
+          strokeOpacity={0.4}
+          strokeDasharray="4 3"
+          strokeWidth={1.5}
           strokeLinejoin="round"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
+
+        {observedLine && (
+          <path
+            d={observedLine}
+            fill="none"
+            stroke={stroke}
+            strokeWidth={2.25}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
 
         {active && (
           <g>
