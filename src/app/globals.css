@@ -101,12 +101,20 @@ body {
   border: 3px solid var(--bg);
 }
 
+/*
+ * A live indicator should read as a heartbeat, not a slow fade: a sharp beat
+ * with a long rest is what says "still going" at a glance, where an even
+ * sinusoid just looks like something loading.
+ */
 @keyframes kolu-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0% { opacity: 1; transform: scale(1); }
+  12% { opacity: 0.25; transform: scale(0.82); }
+  30% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 .live-dot {
-  animation: kolu-pulse 2.4s ease-in-out infinite;
+  animation: kolu-pulse 1.8s ease-in-out infinite;
+  will-change: opacity, transform;
 }
 
 @keyframes kolu-shimmer {

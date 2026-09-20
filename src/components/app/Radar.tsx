@@ -14,7 +14,7 @@ import {
 } from "@/lib/alerts";
 import { AlertControl, ArmedStrip } from "./Alerts";
 import { observed as observedHistory, record as recordHistory } from "@/lib/client-history";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Dot } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AssetList } from "./AssetList";
 import { BasisChart } from "./BasisChart";
@@ -192,7 +192,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           ) : stale ? (
             <Badge tone="warn">Reconnecting</Badge>
           ) : (
-            <Badge tone="down">Live</Badge>
+            <Badge tone="down">
+              <Dot tone="down" live />
+              Live
+            </Badge>
           )}
         </div>
       </div>
