@@ -83,6 +83,11 @@ that has stopped ticking, never alerts. A stalled reference manufactures an
 arbitrarily large apparent basis, and waking someone at 3am for a data outage
 dressed up as an opportunity is the fastest way to get the whole feature muted.
 
+**Balance-aware trading.** Connect a wallet and the ticket reads what you
+actually hold — both token programs, since xStocks are Token-2022 and USDC is
+not. Clicking your balance fills the size. A trade larger than your holdings is
+blocked before it reaches the wallet, rather than failing at the prompt.
+
 **An action surface.** Set your size: gross gap, swap fees per leg, price
 impact, amortised network cost, and what survives. Price impact is a **measured
 route quote from Jupiter** when mints are configured, and your own assumption —

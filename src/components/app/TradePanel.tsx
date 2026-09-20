@@ -8,6 +8,8 @@ import { computeEdge, DEFAULT_COSTS } from "@/lib/basis/edge";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
+import { fmtAmount } from "@/lib/tokens";
+import { useBalances } from "./useBalances";
 
 const SIZES = [500, 2_000, 10_000, 50_000];
 
@@ -31,15 +33,23 @@ type TxState =
   | { kind: "done"; signature: string }
   | { kind: "error"; message: string };
 
+export interface MintMap {
+  quote: { mint: string; decimals: number } | null;
+  tokens: Record<string, { mint: string; decimals: number }>;
+}
+
 export function TradePanel({
   reading,
   hedgeable,
+  mints,
 }: {
   reading: BasisReading;
   hedgeable: boolean;
+  mints: MintMap | null;
 }) {
   const { publicKey, signTransaction, connected } = useWallet();
   const { connection } = useConnection();
+  const { balances, loading: loadingBalances, error: balanceError } = useBalances();
 
   const [notional, setNotional] = useState(2_000);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -48,6 +58,19 @@ export function TradePanel({
 
   // Selling when the token is rich, buying when it is cheap.
   const side: "buy" | "sell" = (reading.basisBps ?? 0) > 0 ? "sell" : "buy";
+
+  const tokenMint = mints?.tokens[reading.ticker]?.mint;
+  const quoteMint = mints?.quote?.mint;
+  const tokenHeld = tokenMint ? (balances.get(tokenMint)?.amount ?? 0) : 0;
+  const usdcHeld = quoteMint ? (balances.get(quoteMint)?.amount ?? 0) : 0;
+
+  // What this trade would actually cost, in the asset being spent.
+  const tokenPrice = reading.token?.price ?? 0;
+  const needed = side === "sell" ? (tokenPrice > 0 ? notional / tokenPrice : 0) : notional;
+  const held = side === "sell" ? tokenHeld : usdcHeld;
+  const unit = side === "sell" ? reading.tokenTicker : "USDC";
+  // Only claim a shortfall once balances have actually been read.
+  const shortfall = connected && !loadingBalances && !balanceError && held < needed;
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +157,7 @@ export function TradePanel({
   }, [publicKey, signTransaction, quote, connection]);
 
   const busy = tx.kind === "building" || tx.kind === "signing" || tx.kind === "sending";
-  const canSwap = connected && quote?.available === true && !busy;
+  const canSwap = connected && quote?.available === true && !busy && !shortfall;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -148,7 +171,20 @@ export function TradePanel({
               Size
             </label>
             <span className="text-[12px] text-[var(--text-3)]">
-              {side === "sell" ? `Sell ${reading.tokenTicker}` : `Buy ${reading.tokenTicker}`}
+              {connected && !loadingBalances && !balanceError ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (side === "sell" && tokenPrice > 0) setNotional(Math.floor(tokenHeld * tokenPrice));
+                    else setNotional(Math.floor(usdcHeld));
+                  }}
+                  className="transition-colors hover:text-white"
+                >
+                  <span className="num">{fmtAmount(held)}</span> {unit} available
+                </button>
+              ) : (
+                <>{side === "sell" ? `Sell ${reading.tokenTicker}` : `Buy ${reading.tokenTicker}`}</>
+              )}
             </span>
           </div>
 
@@ -256,6 +292,16 @@ export function TradePanel({
           </p>
         )}
 
+        {shortfall && (
+          <p className="text-[12px] leading-relaxed text-[var(--warn)]">
+            This trade needs <span className="num">{fmtAmount(needed)}</span> {unit} and
+            the wallet holds <span className="num">{fmtAmount(held)}</span>.
+          </p>
+        )}
+        {balanceError && (
+          <p className="text-[12px] leading-relaxed text-[var(--text-3)]">{balanceError}</p>
+        )}
+
         <Button
           full
           size="lg"
@@ -265,6 +311,8 @@ export function TradePanel({
         >
           {!connected
             ? "Connect wallet to trade"
+            : shortfall
+            ? `Not enough ${unit}`
             : tx.kind === "building"
               ? "Building transaction"
               : tx.kind === "signing"

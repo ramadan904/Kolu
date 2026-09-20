@@ -146,6 +146,15 @@ unlabelled.
       `side=sell`; at a discount, `side=buy`.
 - [ ] **Connect wallet** — Phantom/Solflare appear, connect succeeds, address
       shown truncated.
+- [ ] **Balances appear.** The size row changes from "Sell SPYX" to
+      "<amount> SPYX available". Cross-check one against Phantom. Clicking it
+      fills the size with your whole balance.
+- [ ] **Shortfall is blocked, not attempted.** Set a size larger than you hold.
+      The button reads "Not enough USDC" (or the token) and is disabled — it
+      must never reach the wallet prompt to fail there.
+- [ ] **A balance read failure is not reported as zero.** With the RPC
+      unreachable, the panel says it could not read balances; it must not claim
+      the wallet is empty.
 - [ ] **Swap a trivial size first** ($5). Confirm: transaction builds, wallet
       prompts, signature returns, Solscan link resolves, and the filled amount
       is the asset you expected. Do this before any demo.

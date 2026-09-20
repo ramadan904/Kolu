@@ -19,7 +19,7 @@ import { AssetList } from "./AssetList";
 import { BasisChart } from "./BasisChart";
 import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
-import { TradePanel } from "./TradePanel";
+import { TradePanel, type MintMap } from "./TradePanel";
 
 const POLL_MS = 10_000;
 
@@ -29,6 +29,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [stale, setStale] = useState(false);
+  const [mints, setMints] = useState<MintMap | null>(null);
   const [fired, setFired] = useState<AlertHit[]>([]);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
@@ -42,6 +43,18 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     rulesRef.current = next;
     setRules(next);
     saveRules(next);
+  }, []);
+
+  // Fetched once: mints are public identifiers and change only on a redeploy.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/mints");
+        if (res.ok) setMints((await res.json()) as MintMap);
+      } catch {
+        /* balances simply stay hidden */
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -260,7 +273,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           )}
 
           <div className="hairline mt-6 pt-6">
-            <TradePanel reading={detail} hedgeable={hedgeable} />
+            <TradePanel reading={detail} hedgeable={hedgeable} mints={mints} />
           </div>
 
           <div className="hairline mt-6 pt-6">
