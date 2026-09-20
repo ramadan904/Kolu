@@ -180,6 +180,27 @@ describe("computeEdge", () => {
     expect(e.verdict).toBe("edge");
     expect(e.kind).toBe("directional");
     expect(e.caveat).toContain("not an arbitrage");
+    // The headline number must never be presented as a locked-in edge.
+    expect(e.tone).toBe("caution");
+  });
+
+  it("reserves the confident tone for hedgeable edges that clear costs", () => {
+    const hedged = computeEdge({
+      basisBps: 300,
+      notionalUsd: 20_000,
+      hedgeable: true,
+      costs: { swapFeeBps: 20, priceImpactBps: 5 },
+    });
+    expect(hedged.tone).toBe("good");
+
+    const thin = computeEdge({
+      basisBps: 55,
+      notionalUsd: 20_000,
+      hedgeable: true,
+      costs: { swapFeeBps: 20, priceImpactBps: 5 },
+    });
+    expect(thin.verdict).toBe("thin");
+    expect(thin.tone).toBe("caution");
   });
 
   it("amortises a fixed network fee over notional", () => {

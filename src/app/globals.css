@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/*
+ * Tokens come from the validated reference palette. The diverging pair carries
+ * polarity only — premium (token rich) warm, discount (token cheap) cool — and
+ * never good/bad. Status colours are reserved and always ship with a label, so
+ * hue never carries meaning on its own.
+ */
+:root {
+  color-scheme: light;
+  --surface-page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --surface-2: #f2f2ef;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --premium: #e34948;
+  --discount: #2a78d6;
+  --neutral-mid: #f0efec;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-page: #0d0d0d;
+    --surface-1: #131313;
+    --surface-2: #1c1c1b;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --premium: #e66767;
+    --discount: #3987e5;
+    --neutral-mid: #383835;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-page: #0d0d0d;
+  --surface-1: #131313;
+  --surface-2: #1c1c1b;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+
+  --premium: #e66767;
+  --discount: #3987e5;
+  --neutral-mid: #383835;
+}
+
+html,
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.hairline {
+  border-color: var(--border);
+}
+
+/* Focus ring that survives both themes. */
+:where(button, a, input, select):focus-visible {
+  outline: 2px solid var(--discount);
+  outline-offset: 2px;
+}

@@ -15,6 +15,12 @@
 
 export type EdgeVerdict = "edge" | "thin" | "negative";
 export type EdgeKind = "hedgeable" | "directional";
+/**
+ * How emphatically the UI may present the result. Kept here rather than in a
+ * component so the rule is testable: "good" means the edge survives costs AND
+ * can be locked in. An unhedgeable gap never earns it, however wide.
+ */
+export type EdgeTone = "good" | "caution" | "bad";
 
 export interface CostModel {
   /** Pool/taker fee on the swap, in bps. */
@@ -32,7 +38,9 @@ export interface CostModel {
 
 export const DEFAULT_COSTS: CostModel = {
   swapFeeBps: 30,
-  priceImpactBps: 0,
+  // Not zero. A default of zero impact makes every gap look free on first
+  // render, which is the exact impression this product exists to prevent.
+  priceImpactBps: 15,
   networkFeeUsd: 0.05,
   roundTrip: true,
 };
@@ -52,6 +60,7 @@ export interface EdgeResult {
   netUsd: number;
   verdict: EdgeVerdict;
   kind: EdgeKind;
+  tone: EdgeTone;
   breakdown: { label: string; bps: number }[];
   /** Plain-language statement of what this trade actually is. */
   caveat: string;
@@ -77,6 +86,12 @@ export function computeEdge(input: EdgeInput): EdgeResult {
     netBps <= 0 ? "negative" : netBps < THIN_EDGE_BPS ? "thin" : "edge";
 
   const kind: EdgeKind = input.hedgeable ? "hedgeable" : "directional";
+  const tone: EdgeTone =
+    verdict === "negative"
+      ? "bad"
+      : verdict === "thin" || kind === "directional"
+        ? "caution"
+        : "good";
 
   return {
     grossBps,
@@ -85,6 +100,7 @@ export function computeEdge(input: EdgeInput): EdgeResult {
     netUsd: (netBps / 10_000) * notional,
     verdict,
     kind,
+    tone,
     breakdown: [
       { label: `Swap fee (${legs} leg${legs > 1 ? "s" : ""})`, bps: swapBps },
       { label: "Price impact", bps: impactBps },

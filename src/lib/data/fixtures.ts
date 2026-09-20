@@ -81,8 +81,12 @@ interface ScenarioShape {
 
 const SHAPES: Record<Scenario, ScenarioShape> = {
   weekend_drift: {
-    // Wide, mostly one-directional: risk-on drift with no equity market to anchor it.
-    basisBps: (rng) => 40 + rng() * 190,
+    // Risk-on drift with no equity market to anchor it: the whole board leans the
+    // same way, but beta differs, so magnitudes spread rather than cluster.
+    // One name gapped the other way on its own news, so both poles of the
+    // diverging scale appear and the board is not a wall of one colour.
+    basisBps: (rng, i) =>
+      (30 + rng() * 45) * (1 + (i % 4) * 0.75) * (i === 3 ? -1 : 1),
     referenceAge: 14 * 3600,
     confidenceFrac: 0.00035,
   },
