@@ -14,7 +14,7 @@ export interface PriceReading {
   confidence: number;
   /** Unix seconds when the publishers agreed this price. */
   publishTime: number;
-  source: "pyth" | "fixture";
+  source: "pyth" | "jupiter" | "fixture";
 }
 
 export interface FeedDescriptor {
@@ -26,7 +26,7 @@ export interface FeedDescriptor {
 
 /** Anything that can supply prices: live Hermes, or recorded fixtures. */
 export interface PriceSource {
-  readonly kind: "pyth" | "fixture";
+  readonly kind: "pyth" | "jupiter" | "fixture";
   /** Maps Pyth symbols to feed ids. Implementations should cache. */
   resolveFeeds(symbols: string[]): Promise<Map<string, FeedDescriptor>>;
   /** Latest price for each requested symbol. Missing symbols are omitted. */

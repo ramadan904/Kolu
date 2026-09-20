@@ -73,6 +73,14 @@ export async function GET() {
         // lookup still succeeds and every price request 401s — which looks
         // like a working integration serving no data.
         apiKeyConfigured: hasPythApiKey(),
+        // Jupiter returns the token price and the underlying share price in
+        // one unauthenticated call, which is why live data needs no key.
+        note:
+          configuredMode() === "jupiter"
+            ? "Live prices from Jupiter, both legs, no key required."
+            : configuredMode() === "pyth"
+              ? "Live prices from Pyth Hermes."
+              : "Demo data is switched on deliberately.",
       },
       // The naming that cannot be verified without calling Hermes, echoed back
       // so a mismatch is diagnosable from the deployment itself.

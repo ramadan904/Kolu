@@ -8,10 +8,12 @@
  */
 
 import { FixtureSource, isScenario, type Scenario } from "./fixtures";
+import { JupiterPriceSource } from "./jupiter-prices";
 import { PythSource } from "./pyth";
+import { loadMints } from "../mints";
 import type { PriceSource } from "./types";
 
-export type SourceMode = "pyth" | "fixture";
+export type SourceMode = "pyth" | "jupiter" | "fixture";
 
 export interface ResolvedSource {
   source: PriceSource;
@@ -19,8 +21,18 @@ export interface ResolvedSource {
   scenario: Scenario | null;
 }
 
+/**
+ * Which source to use.
+ *
+ * Jupiter is the default because it returns both legs live with no key, and a
+ * board that has to disclaim its own numbers is a board nobody trusts. Pyth is
+ * better data — it publishes a real confidence interval — so it takes over
+ * whenever a key is configured.
+ */
 export function configuredMode(): SourceMode {
-  return process.env.KOLU_PRICE_SOURCE === "fixture" ? "fixture" : "pyth";
+  const explicit = process.env.KOLU_PRICE_SOURCE;
+  if (explicit === "fixture" || explicit === "pyth" || explicit === "jupiter") return explicit;
+  return process.env.PYTH_API_KEY?.trim() ? "pyth" : "jupiter";
 }
 
 export function configuredScenario(): Scenario {
@@ -77,7 +89,22 @@ export function resetSources(): void {
   pythSources.clear();
 }
 
-export function resolveSource(now?: () => Date): ResolvedSource {
-  if (configuredMode() === "fixture") return makeFixtureSource(now);
+export async function resolveSource(now?: () => Date): Promise<ResolvedSource> {
+  const mode = configuredMode();
+  if (mode === "fixture") return makeFixtureSource(now);
+
+  if (mode === "jupiter") {
+    const mints = await loadMints();
+    return {
+      source: new JupiterPriceSource({
+        mints,
+        endpoint: process.env.JUPITER_ENDPOINT,
+        now,
+      }),
+      mode: "jupiter",
+      scenario: null,
+    };
+  }
+
   return { source: sharedPythSource(), mode: "pyth", scenario: null };
 }

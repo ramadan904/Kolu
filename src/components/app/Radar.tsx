@@ -19,6 +19,7 @@ import { AssetList } from "./AssetList";
 import { BasisChart } from "./BasisChart";
 import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
+import { Portfolio } from "./Portfolio";
 import { TradePanel, type MintMap } from "./TradePanel";
 
 const POLL_MS = 10_000;
@@ -38,6 +39,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   // Mirrored in a ref because the poll callback reads the current rules, and
   // depending on the state would rebuild the interval on every rule change.
   const rulesRef = useRef<AlertRule[]>([]);
+  const detailRef = useRef<HTMLElement | null>(null);
 
   const commitRules = useCallback((next: AlertRule[]) => {
     rulesRef.current = next;
@@ -124,6 +126,13 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return () => clearInterval(id);
   }, [tier, refresh]);
 
+  // The panel renders below the list, so on a tall board a selection made
+  // from the hero happens entirely off screen — the button reads as broken.
+  useEffect(() => {
+    if (!selected || !detailRef.current) return;
+    detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selected]);
+
   useEffect(() => {
     if (!selected) {
       setHistory(null);
@@ -194,6 +203,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </p>
       )}
 
+      <Portfolio readings={board.readings} mints={mints} />
+
       <Hero reading={headline} hedgeable={hedgeable} onTrade={setSelected} />
 
       <ArmedStrip
@@ -246,7 +257,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       />
 
       {detail && (
-        <section className="panel mt-5 p-5 sm:p-6">
+        <section ref={detailRef} className="panel mt-5 scroll-mt-20 p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <h3 className="text-[18px] font-semibold tracking-[-0.02em]">

@@ -12,11 +12,11 @@ afterEach(() => {
 });
 
 describe("shared price source", () => {
-  it("reuses one instance per endpoint", () => {
+  it("reuses one instance per endpoint", async () => {
     process.env.KOLU_PRICE_SOURCE = "pyth";
     process.env.PYTH_HERMES_ENDPOINT = "https://example.test";
     resetSources();
-    expect(resolveSource().source).toBe(resolveSource().source);
+    expect((await resolveSource()).source).toBe((await resolveSource()).source);
   });
 
   it("does not re-resolve feeds on every board build", async () => {

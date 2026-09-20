@@ -34,7 +34,7 @@ export type DegradedKind = "unreachable" | "no_feeds";
 export interface BoardSnapshot {
   generatedAt: string;
   session: MarketSession;
-  source: "pyth" | "fixture";
+  source: "pyth" | "jupiter" | "fixture";
   /** True when the live source failed and fixtures were substituted. */
   fellBack: boolean;
   fallbackReason: string | null;
@@ -91,7 +91,7 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
   const session = getMarketSession(now);
 
   const clock = () => now;
-  let resolved = resolveSource(clock);
+  let resolved = await resolveSource(clock);
   let prices: Map<string, PriceReading>;
   let fellBack = false;
   let fallbackReason: string | null = null;
@@ -109,7 +109,7 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
     prices = await resolved.source.getLatest(symbols);
   }
 
-  if (!fellBack && resolved.mode === "pyth" && prices.size === 0) {
+  if (!fellBack && resolved.mode !== "fixture" && prices.size === 0) {
     // Reachable, and nothing we asked for exists. Do not invent a board.
     degraded = "no_feeds";
     fallbackReason =
