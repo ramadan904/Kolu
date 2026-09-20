@@ -252,10 +252,7 @@ export function TradePanel({
 
         {!quote?.available && !quoting && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">
-            {quote?.reason === "mints_not_configured"
-              ? "Routing is not enabled for this pair yet, so the price impact above is an assumption rather than a measured quote."
-              : (quote?.detail ??
-                "No live route right now, so the price impact above is an assumption rather than a measured quote.")}
+            {unquotedCopy(quote?.reason)}
           </p>
         )}
 
@@ -298,6 +295,27 @@ export function TradePanel({
       </div>
     </div>
   );
+}
+
+/**
+ * What to tell someone when there is no live route.
+ *
+ * The server's `detail` is written for whoever is debugging the deployment —
+ * endpoint names, status codes, environment variables. None of that belongs on
+ * a screen someone is about to trade from; it reads as broken rather than as
+ * degraded. The diagnostics stay available at /api/health.
+ */
+function unquotedCopy(reason: string | undefined): string {
+  const assumption =
+    "The price impact above is an assumption rather than a measured quote.";
+  switch (reason) {
+    case "mints_not_configured":
+      return `Routing is not enabled for this pair yet. ${assumption}`;
+    case "unknown_ticker":
+      return `This pair is not routable. ${assumption}`;
+    default:
+      return `No route available right now. ${assumption}`;
+  }
 }
 
 function Line({

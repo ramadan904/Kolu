@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoardSnapshot } from "@/lib/board";
 import type { HistorySeries } from "@/lib/history";
-import { evaluate, loadRules, saveRules, type AlertHit, type AlertRule } from "@/lib/alerts";
+import {
+  evaluate,
+  loadRules,
+  makeRule,
+  saveRules,
+  type AlertDirection,
+  type AlertHit,
+  type AlertRule,
+} from "@/lib/alerts";
+import { AlertControl, ArmedStrip } from "./Alerts";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AssetList } from "./AssetList";
@@ -21,19 +30,52 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [stale, setStale] = useState(false);
   const [fired, setFired] = useState<AlertHit[]>([]);
+  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported",
+  );
+  // Mirrored in a ref because the poll callback reads the current rules, and
+  // depending on the state would rebuild the interval on every rule change.
   const rulesRef = useRef<AlertRule[]>([]);
 
+  const commitRules = useCallback((next: AlertRule[]) => {
+    rulesRef.current = next;
+    setRules(next);
+    saveRules(next);
+  }, []);
+
   useEffect(() => {
-    rulesRef.current = loadRules();
+    const stored = loadRules();
+    rulesRef.current = stored;
+    setRules(stored);
+    if (typeof Notification !== "undefined") setPermission(Notification.permission);
+  }, []);
+
+  const addRule = useCallback(
+    (ticker: string, thresholdBps: number, direction: AlertDirection) => {
+      commitRules([...rulesRef.current, makeRule(ticker, thresholdBps, direction)]);
+    },
+    [commitRules],
+  );
+
+  const removeRule = useCallback(
+    (id: string) => commitRules(rulesRef.current.filter((r) => r.id !== id)),
+    [commitRules],
+  );
+
+  const requestPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") return;
+    setPermission(await Notification.requestPermission());
   }, []);
 
   const applyRules = useCallback((snapshot: BoardSnapshot) => {
     const current = rulesRef.current;
     if (current.length === 0) return;
-    const { hits, rules } = evaluate(current, snapshot.readings, Date.now());
+    const { hits, rules: next } = evaluate(current, snapshot.readings, Date.now());
     if (hits.length === 0) return;
-    rulesRef.current = rules;
-    saveRules(rules);
+    rulesRef.current = next;
+    setRules(next);
+    saveRules(next);
     setFired((prev) => [...hits, ...prev].slice(0, 6));
     const prefix = snapshot.fellBack ? "[demo] " : "";
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -141,6 +183,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
       <Hero reading={headline} hedgeable={hedgeable} onTrade={setSelected} />
 
+      <ArmedStrip
+        rules={rules}
+        visibleTickers={board.readings.map((r) => r.ticker)}
+        onRemove={removeRule}
+      />
+
       {fired.length > 0 && (
         <div className="mb-5 space-y-1.5">
           {fired.slice(0, 2).map((hit, i) => (
@@ -213,6 +261,19 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
           <div className="hairline mt-6 pt-6">
             <TradePanel reading={detail} hedgeable={hedgeable} />
+          </div>
+
+          <div className="hairline mt-6 pt-6">
+            <AlertControl
+              ticker={detail.ticker}
+              tokenTicker={detail.tokenTicker}
+              currentBps={detail.basisBps}
+              rules={rules}
+              permission={permission}
+              onAdd={addRule}
+              onRemove={removeRule}
+              onRequestPermission={requestPermission}
+            />
           </div>
         </section>
       )}
