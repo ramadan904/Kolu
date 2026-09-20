@@ -108,6 +108,7 @@ export class PythSource implements PriceSource {
       attempts: this.attempts,
       sleep: this.sleep,
       headers: this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : undefined,
+      authHint: "Hermes has required an API key since August 2026; set PYTH_API_KEY.",
     });
   }
 

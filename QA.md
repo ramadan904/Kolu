@@ -135,6 +135,23 @@ unlabelled.
       structured reason, not a stack trace. Same for
       `/api/history?ticker=NOPE`.
 
+## 4b. Trading (only once config/mints.json exists)
+
+- [ ] **Mints are verified, not pasted.** `config/mints.json` must come from
+      the **Discover mints** workflow. Spot-check one mint on Solscan: symbol
+      and decimals must match what the file claims.
+- [ ] Edge panel shows **"Measured price impact"** with a route, not
+      "assumed".
+- [ ] **Direction.** On a token at a premium the quote request uses
+      `side=sell`; at a discount, `side=buy`.
+- [ ] **Connect wallet** — Phantom/Solflare appear, connect succeeds, address
+      shown truncated.
+- [ ] **Swap a trivial size first** ($5). Confirm: transaction builds, wallet
+      prompts, signature returns, Solscan link resolves, and the filled amount
+      is the asset you expected. Do this before any demo.
+- [ ] Cancelling in the wallet shows "You cancelled the transaction", not a
+      stack trace.
+
 ## 5. Deploy & submission
 
 - [ ] Public URL opens with no local setup, no wallet, no key.

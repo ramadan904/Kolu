@@ -99,6 +99,7 @@ export class JupiterSource implements QuoteSource {
         timeoutMs: this.timeoutMs,
         attempts: this.attempts,
         sleep: this.sleep,
+        authHint: "Check JUPITER_ENDPOINT and that outbound requests to it are allowed.",
       },
     );
 

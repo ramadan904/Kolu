@@ -1,0 +1,20 @@
+{
+  "_verified": "2026-09-20, via .github/workflows/discover-mints.yml",
+  "_gates": "exact symbol match in the Jupiter token registry, mint account present on mainnet and owned by Token-2022, registry decimals equal to on-chain decimals",
+  "_note": "Regenerate with `npm run discover-mints` rather than editing by hand. A wrong mint does not throw — it routes an order into a different asset that shares a ticker.",
+  "quote": { "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "decimals": 6 },
+  "tokens": {
+    "TSLA": { "mint": "XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB", "decimals": 8 },
+    "NVDA": { "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", "decimals": 8 },
+    "SPY": { "mint": "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W", "decimals": 8 },
+    "AAPL": { "mint": "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp", "decimals": 8 },
+    "QQQ": { "mint": "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ", "decimals": 8 },
+    "MSFT": { "mint": "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX", "decimals": 8 },
+    "META": { "mint": "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu", "decimals": 8 },
+    "AMZN": { "mint": "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg", "decimals": 8 },
+    "GOOGL": { "mint": "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN", "decimals": 8 },
+    "COIN": { "mint": "Xs7ZdzSHLU9ftNJsii5fCeJhoRWSC32SQGzGQtePxNu", "decimals": 8 },
+    "MSTR": { "mint": "XsP7xzNPvEHS1m6qfanPUGjNmdnmsLKEoNAnHjdxxyZ", "decimals": 8 },
+    "CRCL": { "mint": "XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1", "decimals": 8 }
+  }
+}

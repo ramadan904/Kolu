@@ -102,13 +102,37 @@ describe("fetchJsonWithRetry", () => {
 });
 
 describe("error messages", () => {
-  it("explains a 401 instead of printing a bare number", async () => {
-    // Hermes began requiring an API key in August 2026. A deployment that hits
-    // this needs the remedy, not the status code.
+  it("explains a 401 with the caller's own remedy", async () => {
     const { fetchImpl } = responder([401]);
     await expect(
-      fetchJsonWithRetry("https://x/y", "Hermes", { fetchImpl, sleep: noSleep }),
+      fetchJsonWithRetry("https://x/y", "Hermes", {
+        fetchImpl,
+        sleep: noSleep,
+        authHint: "set PYTH_API_KEY.",
+      }),
     ).rejects.toThrow(/PYTH_API_KEY/);
+  });
+
+  it("never attributes one service's auth failure to another", async () => {
+    // A Jupiter 403 once told the operator to set PYTH_API_KEY, which sends
+    // whoever is debugging to the wrong configuration entirely.
+    const { fetchImpl } = responder([403]);
+    await expect(
+      fetchJsonWithRetry("https://x/y", "Jupiter quote", {
+        fetchImpl,
+        sleep: noSleep,
+        authHint: "Check JUPITER_ENDPOINT.",
+      }),
+    ).rejects.toThrow(/JUPITER_ENDPOINT/);
+
+    const second = responder([403]);
+    await expect(
+      fetchJsonWithRetry("https://x/y", "Jupiter quote", {
+        fetchImpl: second.fetchImpl,
+        sleep: noSleep,
+        authHint: "Check JUPITER_ENDPOINT.",
+      }),
+    ).rejects.not.toThrow(/PYTH/);
   });
 
   it("does not retry an auth failure", async () => {

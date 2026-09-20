@@ -112,6 +112,26 @@ Locally, same thing: `npm run sync-feeds`.
 
 ---
 
+## Enabling trading
+
+The trade path is dark until `config/mints.json` exists, because this repo
+ships no token addresses. A wrong mint does not throw — it routes an order into
+a different asset that happens to share a ticker.
+
+Do not paste addresses from a search result. Run **Actions → Discover mints**
+(or `npm run discover-mints` locally). It resolves every ticker against a token
+registry and then verifies each candidate against chain before accepting it:
+exact symbol match, a real mint account owned by the SPL Token or Token-2022
+program, and registry decimals that agree with on-chain decimals. Anything that
+fails is reported, not guessed at.
+
+The run writes `config/mints.json` and uploads it as a build artifact. Download
+it, drop it in, redeploy. The edge panel switches from "assumed" price impact
+to a measured Jupiter quote and the swap button goes live.
+
+`config/mints.json` is gitignored on purpose: addresses should be re-verified
+on the machine that will use them, not inherited from a commit.
+
 ## Verifying a deployment
 
 ```bash

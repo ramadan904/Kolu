@@ -18,6 +18,12 @@ export interface RetryOptions {
   /** Injectable for tests; real sleeps make a suite slow for no benefit. */
   sleep?: (ms: number) => Promise<void>;
   headers?: Record<string, string>;
+  /**
+   * What to tell the operator when the service rejects us as unauthenticated.
+   * Each caller supplies its own: guidance naming the wrong service sends
+   * whoever is debugging to the wrong configuration entirely.
+   */
+  authHint?: string;
 }
 
 /**
@@ -42,15 +48,13 @@ export function isRetryableStatus(status: number): boolean {
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Turns a bare status code into something a person can act on. 401 in
- * particular is not a bug to debug — Hermes began requiring an API key in
- * August 2026 — and saying so beats printing the number.
+ * Turns a bare status code into something a person can act on.
  */
-function describeStatus(context: string, status: number): string {
+function describeStatus(context: string, status: number, authHint?: string): string {
   if (status === 401 || status === 403) {
-    return `${context}: ${status} — the price oracle rejected the request as unauthenticated. Hermes has required an API key since August 2026; set PYTH_API_KEY.`;
+    return `${context}: ${status} — rejected as unauthenticated.${authHint ? ` ${authHint}` : ""}`;
   }
-  if (status === 429) return `${context}: 429 — rate limited by the oracle.`;
+  if (status === 429) return `${context}: 429 — rate limited.`;
   return `${context}: ${status}`;
 }
 
@@ -79,9 +83,9 @@ export async function fetchJsonWithRetry(
       if (res.ok) return await res.json();
 
       if (!isRetryableStatus(res.status)) {
-        throw new PriceSourceError(describeStatus(context, res.status));
+        throw new PriceSourceError(describeStatus(context, res.status, options.authHint));
       }
-      lastError = new PriceSourceError(describeStatus(context, res.status));
+      lastError = new PriceSourceError(describeStatus(context, res.status, options.authHint));
     } catch (err) {
       // A non-retryable status was already thrown as PriceSourceError above;
       // rethrow it rather than burning the remaining attempts on it.
