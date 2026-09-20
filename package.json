@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "sync-feeds": "tsx scripts/sync-feeds.ts",
     "discover-mints": "tsx scripts/discover-mints.ts",
-    "verify-routes": "tsx scripts/verify-routes.ts"
+    "verify-routes": "tsx scripts/verify-routes.ts",
+    "probe-sources": "tsx scripts/probe-sources.ts"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.28",
