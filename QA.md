@@ -16,6 +16,9 @@ unlabelled.
 ## 0. Smoke (2 min)
 
 - [ ] `curl -s $BASE/api/health | jq .status` returns `ok` or `degraded`
+- [ ] `curl -s $BASE/api/health | jq .build.branch` shows the branch you expect.
+      A deployment pointed at the wrong branch serves a bare 404 and looks
+      identical to a broken app from outside.
 - [ ] If it returns `no_feeds` → **stop**. Symbol naming is wrong; see DEPLOY.md.
       Everything below will be misleading until it is fixed.
 - [ ] `$BASE` loads with no console errors (DevTools → Console)

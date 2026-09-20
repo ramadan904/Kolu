@@ -93,6 +93,10 @@ export async function GET() {
       },
       build: {
         commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
+        // Which branch is actually serving. A deployment pointed at the wrong
+        // branch looks identical to a broken app from the outside — it took a
+        // bare 404 to notice it once, and this makes it a one-request check.
+        branch: process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_BRANCH ?? null,
         env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
       },
     },
