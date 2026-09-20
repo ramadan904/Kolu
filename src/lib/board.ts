@@ -6,6 +6,7 @@ import { computeBasis, rankByDislocation, type BasisReading } from "./basis/comp
 import { makeFixtureSource, resolveSource } from "./data/provider";
 import type { Scenario } from "./data/fixtures";
 import { PriceSourceError, type PriceReading } from "./data/types";
+import { record } from "./history";
 import { getMarketSession, type MarketSession } from "./market/session";
 import { CORE_UNIVERSE, UNIVERSE, symbolsFor, type UniverseEntry } from "./universe";
 
@@ -70,6 +71,10 @@ export async function buildBoard(options: BoardOptions = {}): Promise<BoardSnaps
       ),
     ),
   );
+
+  for (const reading of readings) {
+    if (reading.basisBps !== null) record(reading.ticker, reading.basisBps, now);
+  }
 
   return {
     generatedAt: now.toISOString(),

@@ -4,7 +4,9 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import type { BoardSnapshot } from "@/lib/board";
 import { formatAge } from "@/lib/basis/compute";
 import { fmtBps, fmtClock, fmtPct, fmtUsd } from "@/lib/format";
+import type { HistorySeries } from "@/lib/history";
 import { BasisBar } from "./BasisBar";
+import { BasisChart } from "./BasisChart";
 import { EdgePanel } from "./EdgePanel";
 import { SessionStrip } from "./SessionStrip";
 import { SignalBadge } from "./SignalBadge";
@@ -15,6 +17,7 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
   const [board, setBoard] = useState(initial);
   const [tier, setTier] = useState<"core" | "all">("core");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistorySeries | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (which: "core" | "all") => {
@@ -37,6 +40,29 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
   useEffect(() => {
     void refresh(tier);
   }, [tier, refresh]);
+
+  // History is fetched only for the open row — the full series for every
+  // ticker would be a large payload nobody is looking at.
+  useEffect(() => {
+    if (!expanded) {
+      setHistory(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/history?ticker=${expanded}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const series = (await res.json()) as HistorySeries;
+        if (!cancelled) setHistory(series);
+      } catch {
+        if (!cancelled) setHistory(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded]);
 
   const domain = Math.max(
     50,
@@ -191,6 +217,14 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
                           >
                             {r.note}
                           </p>
+                        )}
+                        {history?.ticker === r.ticker && (
+                          <div
+                            className="mb-5 border-b pb-5"
+                            style={{ borderColor: "var(--border)" }}
+                          >
+                            <BasisChart series={history} />
+                          </div>
                         )}
                         <EdgePanel reading={r} />
                       </td>
