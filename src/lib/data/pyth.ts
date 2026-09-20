@@ -48,6 +48,17 @@ export interface PythSourceOptions {
   endpoint?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** How long to remember that a symbol has no feed. Default 10 minutes. */
+  negativeTtlMs?: number;
+}
+
+/**
+ * The ticker Hermes is searched by. `Equity.US.AAPL/USD` and `Crypto.AAPLX/USD`
+ * yield "AAPL" and "AAPLX" — the former is a substring of the latter, which is
+ * what lets one request serve both.
+ */
+export function queryKeyFor(symbol: string): string {
+  return symbol.split("/")[0].split(".").pop() ?? symbol;
 }
 
 export class PythSource implements PriceSource {
@@ -57,11 +68,15 @@ export class PythSource implements PriceSource {
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
   private readonly feedCache = new Map<string, FeedDescriptor>();
+  /** symbol -> when we last confirmed Hermes has no feed for it. */
+  private readonly negativeCache = new Map<string, number>();
+  private readonly negativeTtlMs: number;
 
   constructor(options: PythSourceOptions = {}) {
     this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 8000;
+    this.negativeTtlMs = options.negativeTtlMs ?? 10 * 60_000;
   }
 
   private async getJson(path: string): Promise<unknown> {
@@ -86,51 +101,90 @@ export class PythSource implements PriceSource {
   }
 
   /**
-   * Hermes' `/v2/price_feeds` search is a substring match over a large catalog,
-   * so we query per symbol and keep only an exact symbol match. Anything else
-   * risks pairing AAPL against a feed that merely contains "AAPL".
+   * Resolves Pyth symbols to feed ids.
+   *
+   * `/v2/price_feeds?query=` is a substring match over a large catalog, which
+   * cuts both ways. Only an exact symbol match is ever accepted — otherwise
+   * `AAPL` would happily bind to any feed whose name merely contains "AAPL".
+   * But because it is a substring match, one request for "AAPL" also returns
+   * AAPLX, so each response is scanned against every symbol still outstanding
+   * and a pair usually costs one request rather than two.
+   *
+   * Symbols that resolve to nothing are remembered for a while. A tokenized
+   * twin with no feed yet is a normal state, and without a negative cache the
+   * board would re-ask Hermes about it on every single refresh, forever.
    */
   async resolveFeeds(symbols: string[]): Promise<Map<string, FeedDescriptor>> {
     const out = new Map<string, FeedDescriptor>();
-    const missing: string[] = [];
+    const unresolved = new Set<string>();
+    const now = Date.now();
 
     for (const symbol of symbols) {
       const cached = this.feedCache.get(symbol);
-      if (cached) out.set(symbol, cached);
-      else missing.push(symbol);
+      if (cached) {
+        out.set(symbol, cached);
+        continue;
+      }
+      const missedAt = this.negativeCache.get(symbol);
+      if (missedAt !== undefined && now - missedAt < this.negativeTtlMs) continue;
+      unresolved.add(symbol);
     }
 
-    await Promise.all(
-      missing.map(async (symbol) => {
-        const query = encodeURIComponent(symbol.split("/")[0].split(".").pop() ?? symbol);
-        const body = await this.getJson(`/v2/price_feeds?query=${query}`);
-        if (!Array.isArray(body)) {
-          throw new PriceSourceError("Hermes /v2/price_feeds: expected an array");
+    if (unresolved.size === 0) return out;
+
+    const keys = [...new Set([...unresolved].map(queryKeyFor))];
+
+    const absorb = (body: unknown) => {
+      if (!Array.isArray(body)) {
+        throw new PriceSourceError("Hermes /v2/price_feeds: expected an array");
+      }
+      for (const item of body) {
+        const rec = asRecord(item, "price_feeds entry");
+        const attrs = asRecord(rec.attributes ?? {}, "price_feeds attributes");
+        const symbol = attrs.symbol;
+        if (typeof symbol !== "string" || !unresolved.has(symbol)) continue;
+
+        const id = rec.id;
+        if (typeof id !== "string") {
+          throw new PriceSourceError(`price_feeds entry for ${symbol}: id was not a string`);
         }
 
-        for (const item of body) {
-          const rec = asRecord(item, "price_feeds entry");
-          const attrs = asRecord(rec.attributes ?? {}, "price_feeds attributes");
-          if (attrs.symbol !== symbol) continue;
-          const id = rec.id;
-          if (typeof id !== "string") {
-            throw new PriceSourceError(`price_feeds entry for ${symbol}: id was not a string`);
-          }
-          const descriptor: FeedDescriptor = {
-            id: normaliseId(id),
-            symbol,
-            assetType: typeof attrs.asset_type === "string" ? attrs.asset_type : "unknown",
-            displaySymbol:
-              typeof attrs.display_symbol === "string" ? attrs.display_symbol : null,
-          };
-          this.feedCache.set(symbol, descriptor);
-          out.set(symbol, descriptor);
-          return;
-        }
-        // Not an error: a tokenized twin may simply not have a feed yet. The
-        // basis engine reports the pair as unavailable rather than guessing.
+        const descriptor: FeedDescriptor = {
+          id: normaliseId(id),
+          symbol,
+          assetType: typeof attrs.asset_type === "string" ? attrs.asset_type : "unknown",
+          displaySymbol: typeof attrs.display_symbol === "string" ? attrs.display_symbol : null,
+        };
+        this.feedCache.set(symbol, descriptor);
+        this.negativeCache.delete(symbol);
+        out.set(symbol, descriptor);
+        unresolved.delete(symbol);
+      }
+    };
+
+    // A key is broad when no other key is a prefix of it: "AAPL" is broad,
+    // "AAPLX" is not, because searching the former already returns the latter.
+    const broad = keys.filter(
+      (key) => !keys.some((other) => other !== key && key.startsWith(other)),
+    );
+
+    await Promise.all(
+      broad.map(async (key) => {
+        absorb(await this.getJson(`/v2/price_feeds?query=${encodeURIComponent(key)}`));
       }),
     );
+
+    // Second pass: only the narrow keys the broad pass did not pick up for free.
+    const remaining = [...new Set([...unresolved].map(queryKeyFor))].filter(
+      (key) => !broad.includes(key),
+    );
+    await Promise.all(
+      remaining.map(async (key) => {
+        absorb(await this.getJson(`/v2/price_feeds?query=${encodeURIComponent(key)}`));
+      }),
+    );
+
+    for (const symbol of unresolved) this.negativeCache.set(symbol, now);
 
     return out;
   }

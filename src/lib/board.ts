@@ -34,7 +34,40 @@ export interface BoardOptions {
   now?: Date;
 }
 
+/**
+ * Short-lived snapshot cache.
+ *
+ * The page, the board poll and the history endpoint each want a board, and a
+ * user clicking around produces several requests a second. Without this, each
+ * one becomes its own round of oracle calls — wasteful, and the quickest way to
+ * get rate-limited in front of a judge. The window is deliberately shorter than
+ * the UI's poll interval, so the board never shows something staler than it
+ * would have anyway.
+ */
+const CACHE_TTL_MS = Number(process.env.KOLU_BOARD_CACHE_MS ?? 4000);
+const snapshots = new Map<string, { at: number; snapshot: BoardSnapshot }>();
+
+export function clearBoardCache(): void {
+  snapshots.clear();
+}
+
 export async function buildBoard(options: BoardOptions = {}): Promise<BoardSnapshot> {
+  // An explicit clock means a caller wants a specific moment — tests, mostly.
+  // Serving those from a cache keyed only by tier would be wrong.
+  const cacheable = options.now === undefined && CACHE_TTL_MS > 0;
+  const key = options.tier ?? "core";
+
+  if (cacheable) {
+    const hit = snapshots.get(key);
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.snapshot;
+  }
+
+  const snapshot = await buildBoardUncached(options);
+  if (cacheable) snapshots.set(key, { at: Date.now(), snapshot });
+  return snapshot;
+}
+
+async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot> {
   const now = options.now ?? new Date();
   const entries: UniverseEntry[] = options.tier === "all" ? UNIVERSE : CORE_UNIVERSE;
   const symbols = symbolsFor(entries);

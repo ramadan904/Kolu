@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildBoard } from "@/lib/board";
+import { buildBoard, clearBoardCache } from "@/lib/board";
 import { FixtureSource } from "@/lib/data/fixtures";
 import { PythSource } from "@/lib/data/pyth";
 import { symbolsFor, CORE_UNIVERSE } from "@/lib/universe";
@@ -166,5 +166,34 @@ describe("PythSource", () => {
     await expect(new PythSource({ fetchImpl }).getLatest(["Equity.US.AAPL/USD"])).rejects.toThrow(
       /exponent/,
     );
+  });
+});
+
+describe("board snapshot cache", () => {
+  beforeEach(() => {
+    process.env.KOLU_PRICE_SOURCE = "fixture";
+    process.env.KOLU_SCENARIO = "live_dislocation";
+    clearBoardCache();
+  });
+
+  it("serves repeat calls from cache within the window", async () => {
+    const first = await buildBoard({ tier: "core" });
+    const second = await buildBoard({ tier: "core" });
+    expect(second.generatedAt).toBe(first.generatedAt);
+  });
+
+  it("keeps tiers separate", async () => {
+    const core = await buildBoard({ tier: "core" });
+    const all = await buildBoard({ tier: "all" });
+    expect(all.readings.length).toBeGreaterThan(core.readings.length);
+  });
+
+  it("never serves a caller that asked for a specific moment", async () => {
+    // Tests and any point-in-time query must not be answered from a cache
+    // keyed only by tier.
+    const a = await buildBoard({ tier: "core", now: OPEN });
+    const b = await buildBoard({ tier: "core", now: WEEKEND });
+    expect(a.session.phase).toBe("regular");
+    expect(b.session.phase).toBe("weekend");
   });
 });
