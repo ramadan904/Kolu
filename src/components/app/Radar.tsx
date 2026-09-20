@@ -21,7 +21,8 @@ import { BasisChart } from "./BasisChart";
 import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
 import { Portfolio } from "./Portfolio";
-import { TradePanel, type MintMap } from "./TradePanel";
+import { type MintMap } from "./TradePanel";
+import { TradeDrawer } from "./TradeDrawer";
 
 const POLL_MS = 10_000;
 
@@ -41,7 +42,6 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   // Mirrored in a ref because the poll callback reads the current rules, and
   // depending on the state would rebuild the interval on every rule change.
   const rulesRef = useRef<AlertRule[]>([]);
-  const detailRef = useRef<HTMLElement | null>(null);
 
   const commitRules = useCallback((next: AlertRule[]) => {
     rulesRef.current = next;
@@ -134,13 +134,6 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return () => clearInterval(id);
   }, [tier, refresh]);
 
-  // The panel renders below the list, so on a tall board a selection made
-  // from the hero happens entirely off screen — the button reads as broken.
-  useEffect(() => {
-    if (!selected || !detailRef.current) return;
-    detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [selected]);
-
   useEffect(() => {
     if (!selected) {
       setHistory(null);
@@ -211,7 +204,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       {board.source === "fixture" && board.degraded !== "no_feeds" && (
         <p className="mt-4 rounded-[var(--radius)] border border-[var(--warn)]/20 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] leading-relaxed text-[var(--text-2)]">
           {board.fellBack
-            ? "Live prices need a Pyth API key, so this is a modelled market."
+            ? "The price feed is unreachable, so this is a modelled market."
             : "Demo mode is switched on, so this is a modelled market."}{" "}
           <span className="text-white">No number on this page is a real market price.</span>
         </p>
@@ -276,49 +269,19 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       />
 
       {detail && (
-        <section ref={detailRef} className="panel mt-5 scroll-mt-20 p-5 sm:p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <div>
-              <h3 className="text-[18px] font-semibold tracking-[-0.02em]">
-                {detail.tokenTicker}
-                <span className="ml-2 text-[14px] font-normal text-[var(--text-3)]">
-                  {detail.name}
-                </span>
-              </h3>
-              {detail.note && (
-                <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[var(--text-2)]">
-                  {detail.note}
-                </p>
-              )}
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
-              Close
-            </Button>
-          </div>
-
-          {history && (
-            <div className="mt-5">
-              <BasisChart series={history} observed={observed} />
-            </div>
-          )}
-
-          <div className="hairline mt-6 pt-6">
-            <TradePanel reading={detail} hedgeable={hedgeable} mints={mints} />
-          </div>
-
-          <div className="hairline mt-6 pt-6">
-            <AlertControl
-              ticker={detail.ticker}
-              tokenTicker={detail.tokenTicker}
-              currentBps={detail.basisBps}
-              rules={rules}
-              permission={permission}
-              onAdd={addRule}
-              onRemove={removeRule}
-              onRequestPermission={requestPermission}
-            />
-          </div>
-        </section>
+        <TradeDrawer
+          reading={detail}
+          history={history}
+          observed={observed}
+          hedgeable={hedgeable}
+          mints={mints}
+          rules={rules}
+          permission={permission}
+          onAddRule={addRule}
+          onRemoveRule={removeRule}
+          onRequestPermission={requestPermission}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );

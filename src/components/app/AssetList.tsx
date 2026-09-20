@@ -52,7 +52,7 @@ export function AssetList({
         <span className="hidden text-right sm:block">Token</span>
         <span className="hidden text-right sm:block">Real share</span>
         <span className="text-right">Gap</span>
-        <span className="hidden text-right sm:block">Net edge</span>
+        <span className="hidden text-right sm:block">Net at $10k</span>
       </div>
 
       <ul>
@@ -71,12 +71,22 @@ export function AssetList({
                 type="button"
                 onClick={() => onSelect(r.ticker)}
                 aria-expanded={isSelected}
-                className={`grid w-full grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-[var(--raised)] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5 ${isSelected ? "bg-[var(--raised)]" : ""}`}
+                className={`group grid w-full grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--raised)] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5 ${isSelected ? "bg-[var(--raised)]" : ""}`}
               >
                 <span className="min-w-0">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium">{r.tokenTicker}</span>
                     {r.signal === "degraded_feed" && <Dot tone="warn" />}
+                    <svg
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                      width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+                    >
+                      <path
+                        d="M4.5 2.5L8 6l-3.5 3.5"
+                        stroke="var(--text-3)" strokeWidth="1.5"
+                        strokeLinecap="round" strokeLinejoin="round"
+                      />
+                    </svg>
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
                     <span>{SIGNAL_LABEL[r.signal]}</span>
@@ -115,22 +125,32 @@ export function AssetList({
                   )}
                 </span>
 
+                {/* Always a number. Hiding a negative net behind a dash made
+                    this column permanently blank during market hours, when the
+                    honest answer — how far underwater the trade is — is
+                    exactly what a trader needs. */}
                 <span className="num hidden text-right text-[14px] sm:block">
                   {edge === null ? (
                     <span className="text-[var(--text-3)]">—</span>
                   ) : (
-                    <span
-                      style={{
-                        color:
-                          edge.tone === "good"
-                            ? "var(--down)"
-                            : edge.tone === "caution"
-                              ? "var(--warn)"
-                              : "var(--text-3)",
-                      }}
-                    >
-                      {edge.netBps > 0 ? fmtBps(edge.netBps, 0) : "—"}
-                    </span>
+                    <>
+                      <span
+                        className="block"
+                        style={{
+                          color:
+                            edge.netBps > 0
+                              ? edge.tone === "good"
+                                ? "var(--down)"
+                                : "var(--warn)"
+                              : "var(--text-2)",
+                        }}
+                      >
+                        {fmtBps(edge.netBps, 0)}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-[var(--text-3)]">
+                        {edge.netBps > 0 ? fmtUsd(edge.netUsd) : "below costs"}
+                      </span>
+                    </>
                   )}
                 </span>
               </button>

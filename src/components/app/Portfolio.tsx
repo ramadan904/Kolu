@@ -40,7 +40,23 @@ export function Portfolio({
       .sort((a, b) => b.value - a.value);
   }, [readings, balances, mints]);
 
-  if (!connected) return null;
+  // Rendering nothing until a wallet connects means the section is invisible to
+  // everyone evaluating the product. It states what it will show instead.
+  if (!connected) {
+    return (
+      <div className="panel mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+            Your position
+          </div>
+          <p className="mt-1 text-[13px] text-[var(--text-2)]">
+            Connect a wallet to value your xStocks against the live gaps below.
+          </p>
+        </div>
+        <span className="text-[12px] text-[var(--text-3)]">Read-only · nothing is signed</span>
+      </div>
+    );
+  }
 
   const cash = mints?.quote ? (balances.get(mints.quote.mint)?.amount ?? 0) : 0;
   const positions = rows.reduce((sum, r) => sum + r.value, 0);
