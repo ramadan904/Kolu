@@ -242,3 +242,33 @@ describe("formatAge", () => {
     expect(formatAge(3600 * 72)).toBe("3d");
   });
 });
+
+describe("worstCase", () => {
+  it("shows what a fill at the tolerance limit leaves", async () => {
+    const { worstCase } = await import("@/lib/basis/edge");
+    // The bug this exists for: an 83bps edge quoted with 50bps of allowed
+    // slippage can settle at 33, while the screen promised 83.
+    const w = worstCase(83, 50);
+    expect(w.worstNetBps).toBe(33);
+    expect(w.toleranceExceedsEdge).toBe(false);
+    expect(w.edgeAtRisk).toBeCloseTo(50 / 83, 6);
+  });
+
+  it("flags a tolerance that can turn the trade into a loss", async () => {
+    const { worstCase } = await import("@/lib/basis/edge");
+    const w = worstCase(40, 50);
+    expect(w.worstNetBps).toBe(-10);
+    expect(w.toleranceExceedsEdge).toBe(true);
+    expect(w.edgeAtRisk).toBe(1);
+  });
+
+  it("does not flag a trade that had no edge to begin with", async () => {
+    const { worstCase } = await import("@/lib/basis/edge");
+    expect(worstCase(-20, 50).toleranceExceedsEdge).toBe(false);
+  });
+
+  it("treats a negative tolerance as zero", async () => {
+    const { worstCase } = await import("@/lib/basis/edge");
+    expect(worstCase(60, -10).worstNetBps).toBe(60);
+  });
+});

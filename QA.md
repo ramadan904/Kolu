@@ -144,6 +144,13 @@ unlabelled.
       "assumed".
 - [ ] **Direction.** On a token at a premium the quote request uses
       `side=sell`; at a discount, `side=buy`.
+- [ ] **Slippage is the user's choice, and priced.** Changing Max slippage
+      re-requests the quote with that tolerance (Network tab → `slippageBps`).
+      The "Worst case at X% slippage" line equals net edge minus the tolerance.
+- [ ] **A tolerance wider than the edge is called out.** Pick a slippage larger
+      than the net edge: the worst-case line turns red and the panel says a fill
+      at that limit wipes out the edge. The headline net edge must NOT silently
+      absorb the tolerance — it is a floor, not a deduction.
 - [ ] **Connect wallet** — Phantom/Solflare appear, connect succeeds, address
       shown truncated.
 - [ ] **Balances appear.** The size row changes from "Sell SPYX" to

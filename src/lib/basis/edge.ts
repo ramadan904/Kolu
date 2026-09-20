@@ -148,3 +148,37 @@ export function maxViableNotional(
   }
   return Math.floor(low);
 }
+
+export interface WorstCase {
+  /** Net edge if the fill lands exactly at the slippage tolerance. */
+  worstNetBps: number;
+  /** True when a fill at the limit turns the trade into a loss. */
+  toleranceExceedsEdge: boolean;
+  /** Share of the edge the tolerance can consume, 0–1. */
+  edgeAtRisk: number;
+}
+
+/**
+ * What the trade nets if the fill lands at the edge of the slippage tolerance.
+ *
+ * This product's entire claim is that it tells you what you actually net, so a
+ * slippage tolerance quoted nowhere is a hole in the claim: an 83bps edge
+ * executed with 50bps of allowed slippage can settle at 33bps, and the screen
+ * would have promised 83 the whole way.
+ *
+ * Tolerance is a worst case, not an expectation — most fills come in far
+ * inside it. It is shown as a floor, never subtracted from the headline.
+ */
+export function worstCase(netBps: number, slippageBps: number): WorstCase {
+  const tolerance = Math.max(0, slippageBps);
+  const worstNetBps = netBps - tolerance;
+  return {
+    worstNetBps,
+    toleranceExceedsEdge: netBps > 0 && worstNetBps <= 0,
+    edgeAtRisk: netBps > 0 ? Math.min(1, tolerance / netBps) : 1,
+  };
+}
+
+/** Slippage choices offered in the ticket, in bps. */
+export const SLIPPAGE_OPTIONS = [10, 30, 50, 100] as const;
+export const DEFAULT_SLIPPAGE_BPS = 30;

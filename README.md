@@ -83,6 +83,11 @@ that has stopped ticking, never alerts. A stalled reference manufactures an
 arbitrarily large apparent basis, and waking someone at 3am for a data outage
 dressed up as an opportunity is the fastest way to get the whole feature muted.
 
+**Slippage you chose, priced.** The ticket shows what the trade nets if the
+fill lands at the edge of your tolerance, and says so when that tolerance is
+wider than the edge itself. A default 0.5% slippage quietly eating most of an
+83bps gap is the exact failure this product exists to prevent.
+
 **Balance-aware trading.** Connect a wallet and the ticket reads what you
 actually hold — both token programs, since xStocks are Token-2022 and USDC is
 not. Clicking your balance fills the size. A trade larger than your holdings is

@@ -88,7 +88,9 @@ export class JupiterSource implements QuoteSource {
       inputMint: request.inputMint,
       outputMint: request.outputMint,
       amount: request.amount.toString(),
-      slippageBps: String(request.slippageBps ?? 50),
+      // No silent default: a tolerance the caller did not choose is one the
+      // user was never shown.
+      slippageBps: String(request.slippageBps ?? 30),
     });
 
     const body = await fetchJsonWithRetry(

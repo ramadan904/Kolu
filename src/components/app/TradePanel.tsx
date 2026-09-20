@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import type { BasisReading } from "@/lib/basis/compute";
-import { computeEdge, DEFAULT_COSTS } from "@/lib/basis/edge";
+import {
+  computeEdge,
+  DEFAULT_COSTS,
+  DEFAULT_SLIPPAGE_BPS,
+  SLIPPAGE_OPTIONS,
+  worstCase,
+} from "@/lib/basis/edge";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
@@ -18,6 +24,7 @@ interface Quote {
   reason?: string;
   detail?: string;
   side?: "buy" | "sell";
+  slippageBps?: number;
   priceImpactBps?: number;
   route?: string[];
   outAmount?: string;
@@ -52,6 +59,7 @@ export function TradePanel({
   const { balances, loading: loadingBalances, error: balanceError } = useBalances();
 
   const [notional, setNotional] = useState(2_000);
+  const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [tx, setTx] = useState<TxState>({ kind: "idle" });
@@ -83,6 +91,7 @@ export function TradePanel({
             notional: String(notional),
             side,
             price: String(reading.token?.price ?? 0),
+            slippageBps: String(slippageBps),
           });
           const res = await fetch(`/api/quote?${params}`, { cache: "no-store" });
           const body = (await res.json()) as Quote;
@@ -98,7 +107,7 @@ export function TradePanel({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [reading.ticker, reading.token?.price, notional, side]);
+  }, [reading.ticker, reading.token?.price, notional, side, slippageBps]);
 
   const impactBps = quote?.available
     ? (quote.priceImpactBps ?? 0)
@@ -116,6 +125,8 @@ export function TradePanel({
           }),
     [reading.basisBps, notional, hedgeable, impactBps],
   );
+
+  const risk = edge ? worstCase(edge.netBps, slippageBps) : null;
 
   const swap = useCallback(async () => {
     if (!publicKey || !signTransaction || !quote?.quote) return;
@@ -220,6 +231,29 @@ export function TradePanel({
           </div>
         </div>
 
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+            Max slippage
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {SLIPPAGE_OPTIONS.map((bps) => (
+              <button
+                key={bps}
+                type="button"
+                onClick={() => setSlippageBps(bps)}
+                aria-pressed={slippageBps === bps}
+                className={`num rounded-[var(--radius-sm)] border px-2.5 py-1 text-[12px] transition-colors ${
+                  slippageBps === bps
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-white"
+                }`}
+              >
+                {(bps / 100).toFixed(bps < 100 ? 1 : 0)}%
+              </button>
+            ))}
+          </div>
+        </div>
+
         <dl className="space-y-2 text-[13px]">
           <Line label="Gross gap" value={edge ? fmtBps(edge.grossBps, 1) : "—"} />
           <Line
@@ -245,6 +279,22 @@ export function TradePanel({
             muted
           />
         </dl>
+
+        {risk && edge && edge.netBps > 0 && (
+          <div className="flex items-baseline justify-between text-[13px]">
+            <dt className="text-[var(--text-2)]">
+              Worst case at {(slippageBps / 100).toFixed(slippageBps < 100 ? 1 : 0)}% slippage
+            </dt>
+            <dd
+              className="num"
+              style={{
+                color: risk.toleranceExceedsEdge ? "var(--up)" : "var(--text-2)",
+              }}
+            >
+              {fmtBps(risk.worstNetBps, 1)}
+            </dd>
+          </div>
+        )}
 
         <div className="hairline flex items-baseline justify-between pt-3">
           <span className="text-[13px] font-medium">Net edge</span>
@@ -289,6 +339,13 @@ export function TradePanel({
         {!quote?.available && !quoting && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">
             {unquotedCopy(quote?.reason)}
+          </p>
+        )}
+
+        {risk?.toleranceExceedsEdge && (
+          <p className="text-[12px] leading-relaxed text-[var(--up)]">
+            A fill at this slippage limit wipes out the edge. Tighten the tolerance or
+            trade smaller — the gap is not wide enough to absorb {(slippageBps / 100).toFixed(1)}%.
           </p>
         )}
 

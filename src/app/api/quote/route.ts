@@ -26,6 +26,12 @@ export async function GET(request: Request) {
   // Impact is not symmetric — the thin side of the book is the one that costs
   // you — so quoting the wrong direction measures a trade nobody would make.
   const side = params.get("side") === "sell" ? "sell" : "buy";
+  // Clamped rather than trusted: a quote requested with absurd tolerance is a
+  // quote that can fill anywhere.
+  const slippageRaw = Number(params.get("slippageBps") ?? "30");
+  const slippageBps = Number.isFinite(slippageRaw)
+    ? Math.min(500, Math.max(1, Math.round(slippageRaw)))
+    : 30;
 
   const entry = findEntry(ticker);
   if (!entry) return fail("unknown_ticker", `Unknown ticker: ${ticker}`, 404);
@@ -55,12 +61,14 @@ export async function GET(request: Request) {
             inputMint: quoteMint.mint,
             outputMint: tokenMint.mint,
             amount: toBaseUnits(notional, quoteMint.decimals),
+            slippageBps,
           }
         : {
             inputMint: tokenMint.mint,
             outputMint: quoteMint.mint,
             // Same USD notional, expressed in tokens.
             amount: toBaseUnits(notional / tokenPrice, tokenMint.decimals),
+            slippageBps,
           };
 
     const quote = await new JupiterSource({ endpoint: process.env.JUPITER_ENDPOINT }).getQuote(
@@ -71,6 +79,7 @@ export async function GET(request: Request) {
       {
         available: true,
         side,
+        slippageBps,
         priceImpactBps: quote.priceImpactBps,
         route: quote.route,
         // BigInt is not JSON-serialisable; amounts go out as strings.
