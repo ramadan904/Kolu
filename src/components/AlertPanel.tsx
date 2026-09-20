@@ -136,7 +136,12 @@ export function AlertPanel({
 
           {rules.length > 0 && (
             <ul className="space-y-1 text-sm">
-              {rules.map((r) => (
+              {rules.map((r) => {
+                // A rule for a ticker outside the current tier cannot fire,
+                // because the board never evaluates it. Silence that the user
+                // did not ask for has to be visible.
+                const watching = tickers.includes(r.ticker);
+                return (
                 <li
                   key={r.id}
                   className="flex items-center justify-between rounded-md px-2 py-1.5"
@@ -145,6 +150,14 @@ export function AlertPanel({
                   <span className="tnum">
                     {r.ticker}X · {r.direction === "either" ? "gap" : r.direction} over{" "}
                     {r.thresholdBps}bps
+                    {!watching && (
+                      <span
+                        className="ml-2 text-xs"
+                        style={{ color: "var(--status-warning)" }}
+                      >
+                        ▲ not on this board — switch to All to watch it
+                      </span>
+                    )}
                     {r.lastFiredAt && (
                       <span className="ml-2 text-xs" style={{ color: "var(--text-muted)" }}>
                         last fired{" "}
@@ -168,7 +181,8 @@ export function AlertPanel({
                     Remove
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 
