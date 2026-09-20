@@ -10,8 +10,13 @@ function countdown(minutes: number | null): string | null {
 }
 
 /**
- * The single most load-bearing line on the screen. Every number below it means
- * something different depending on whether the underlying market is open.
+ * Market session, stated as a fact.
+ *
+ * It used to append "gaps cannot be hedged while it is shut" in warning
+ * colour. True, and the wrong place for it: a caveat at the top of the screen
+ * scolds the reader before they have read a number, and reads as a product
+ * apologising for itself. The same point belongs where a trade is actually
+ * decided — the ticket says it, next to the money.
  */
 export function MarketClock({ session }: { session: MarketSession }) {
   const open = session.isRegularHours;
@@ -36,10 +41,6 @@ export function MarketClock({ session }: { session: MarketSession }) {
           : `${session.etTime} ET`}
         {next && ` · ${SESSION_COPY[session.nextPhase ?? "closed"].toLowerCase()} in ${next}`}
       </span>
-
-      {!open && (
-        <span className="text-[var(--warn)]">· gaps cannot be hedged while it is shut</span>
-      )}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export function Hero({
         <span className="num text-white">{fmtUsd(reading.equity.price)}</span>.{" "}
         {hedgeable
           ? `About ${Math.round(edge.netBps)}bps survives fees and slippage on a $10k clip.`
-          : "The underlying market is shut, so this is a bet on convergence at the open — not an arbitrage."}
+          : `Worth about ${fmtUsd(Math.abs(edge.netUsd))} on a $10k position if it converges at the open.`}
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2.5">
