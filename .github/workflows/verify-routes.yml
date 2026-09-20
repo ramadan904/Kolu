@@ -1,0 +1,30 @@
+name: Verify trade routes
+
+# Exercises the swap path against live Jupiter with the real mints, up to the
+# signing boundary. Runs here because this is where the network is — the only
+# other way to test it is with someone's own money.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/verify-routes.ts"
+      - "src/lib/data/jupiter.ts"
+      - "src/lib/mints.ts"
+      - "config/mints.json"
+      - ".github/workflows/verify-routes.yml"
+
+jobs:
+  routes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Quote and build against live Jupiter
+        env:
+          JUPITER_ENDPOINT: ${{ vars.JUPITER_ENDPOINT || 'https://lite-api.jup.ag' }}
+        run: npm run verify-routes
