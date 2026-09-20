@@ -2,7 +2,7 @@
   "name": "kolu",
   "version": "0.1.0",
   "private": true,
-  "description": "Kolu — fair-value basis terminal for tokenized stocks on Solana",
+  "description": "Kolu \u2014 fair-value basis terminal for tokenized stocks on Solana",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sync-feeds": "tsx scripts/sync-feeds.ts"
+    "sync-feeds": "tsx scripts/sync-feeds.ts",
+    "discover-mints": "tsx scripts/discover-mints.ts"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.28",

@@ -1,0 +1,37 @@
+name: Discover mints
+
+# Resolves the SPL mint for every tokenized ticker and verifies each one
+# against chain before accepting it. Runs here because GitHub's runners have
+# the network access a wrong address would otherwise be guessed without.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/discover-mints.ts"
+      - ".github/workflows/discover-mints.yml"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Resolve and verify mints
+        env:
+          JUPITER_ENDPOINT: ${{ vars.JUPITER_ENDPOINT || 'https://lite-api.jup.ag' }}
+          SOLANA_RPC: ${{ secrets.SOLANA_RPC || 'https://api.mainnet-beta.solana.com' }}
+        run: npm run discover-mints
+
+      - name: Upload verified mint config
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mints
+          path: config/mints.json
+          if-no-files-found: warn
