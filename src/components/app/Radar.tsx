@@ -20,6 +20,7 @@ import { AssetList } from "./AssetList";
 import { BasisChart } from "./BasisChart";
 import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
+import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
 import { type MintMap } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
@@ -237,6 +238,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           ))}
         </div>
       )}
+
+      <MarketMap readings={board.readings} onSelect={setSelected} />
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
