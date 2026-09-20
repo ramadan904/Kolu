@@ -21,6 +21,10 @@ unlabelled.
       identical to a broken app from outside.
 - [ ] If it returns `no_feeds` → **stop**. Symbol naming is wrong; see DEPLOY.md.
       Everything below will be misleading until it is fixed.
+- [ ] If it returns `demo_fallback` with `source.apiKeyConfigured: false`, the
+      board is on demo data because Hermes needs an API key (required since
+      August 2026). Everything is still testable; just remember no number on
+      screen is a live market price.
 - [ ] `$BASE` loads with no console errors (DevTools → Console)
 - [ ] Session strip shows the correct US market phase for the time you are testing
 

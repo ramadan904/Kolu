@@ -55,11 +55,12 @@ Multi-stage, runs unprivileged, and carries a `HEALTHCHECK` that polls
 
 ## Environment variables
 
-**Nothing is required.** Kolu runs against public Pyth with no key. Everything
-below is optional.
+**One matters: `PYTH_API_KEY`.** Without it the app runs and is fully
+demonstrable, but on labelled demo data rather than live prices.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
+| `PYTH_API_KEY` | _(none)_ | **Required for live prices.** See below. |
 | `PYTH_HERMES_ENDPOINT` | `https://hermes.pyth.network` | Oracle endpoint. Point at a private Hermes if you have one. |
 | `KOLU_PRICE_SOURCE` | `pyth` | `fixture` forces demo data. Use for a guaranteed-stable demo. |
 | `KOLU_SCENARIO` | `weekend_drift` | Which demo scenario: `weekend_drift`, `live_dislocation`, `calm`, `degraded`. |
@@ -68,6 +69,22 @@ below is optional.
 | `KOLU_TOKEN_TICKER_TEMPLATE` | `{TICKER}X` | How a ticker becomes its tokenized ticker. |
 | `KOLU_BOARD_CACHE_MS` | `4000` | Snapshot cache window. `0` disables. |
 | `JUPITER_ENDPOINT` | `https://lite-api.jup.ag` | Router used for measured price impact. |
+
+### Why live prices need a key
+
+Pyth began requiring authentication on Hermes in **August 2026**. The split is
+awkward and worth knowing: `/v2/price_feeds` still answers anonymously, so
+symbol resolution succeeds and the app reports all 12 pairs resolved — but
+`/v2/updates/price/latest` returns **401**, so not one price arrives.
+
+The result looks like a working integration serving no data. `/api/health`
+names it directly: `source.apiKeyConfigured` tells you whether a key is set,
+and the fallback reason says what to do.
+
+Get a key from the Pyth developer hub, then set `PYTH_API_KEY` in your host's
+environment (Vercel: Settings → Environment Variables → add → Redeploy).
+Without it, `status` reads `demo_fallback` and the board shows the amber
+"Demo data" banner — honest and demoable, just not live.
 
 ### The symbol-naming variable
 

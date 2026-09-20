@@ -17,6 +17,21 @@ export interface RetryOptions {
   fetchImpl?: typeof fetch;
   /** Injectable for tests; real sleeps make a suite slow for no benefit. */
   sleep?: (ms: number) => Promise<void>;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Error messages end up on screen, and a Hermes price request carries two
+ * dozen 64-character feed ids in its query string. Printed whole it is an
+ * unreadable wall that hides the actual status code.
+ */
+export function shortenUrl(url: string, max = 90): string {
+  if (url.length <= max) return url;
+  const [base, query = ""] = url.split("?", 2);
+  const params = new URLSearchParams(query);
+  const ids = params.getAll("ids[]");
+  if (ids.length > 1) return `${base}?ids[]=… (${ids.length} feeds)`;
+  return `${url.slice(0, max)}…`;
 }
 
 /** 429 and 5xx are worth another go. Everything else is the server's final word. */
@@ -25,6 +40,19 @@ export function isRetryableStatus(status: number): boolean {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Turns a bare status code into something a person can act on. 401 in
+ * particular is not a bug to debug — Hermes began requiring an API key in
+ * August 2026 — and saying so beats printing the number.
+ */
+function describeStatus(context: string, status: number): string {
+  if (status === 401 || status === 403) {
+    return `${context}: ${status} — the price oracle rejected the request as unauthenticated. Hermes has required an API key since August 2026; set PYTH_API_KEY.`;
+  }
+  if (status === 429) return `${context}: 429 — rate limited by the oracle.`;
+  return `${context}: ${status}`;
+}
 
 export async function fetchJsonWithRetry(
   url: string,
@@ -45,15 +73,15 @@ export async function fetchJsonWithRetry(
     try {
       const res = await doFetch(url, {
         signal: controller.signal,
-        headers: { accept: "application/json" },
+        headers: { accept: "application/json", ...options.headers },
       });
 
       if (res.ok) return await res.json();
 
       if (!isRetryableStatus(res.status)) {
-        throw new PriceSourceError(`${context}: ${res.status}`);
+        throw new PriceSourceError(describeStatus(context, res.status));
       }
-      lastError = new PriceSourceError(`${context}: ${res.status}`);
+      lastError = new PriceSourceError(describeStatus(context, res.status));
     } catch (err) {
       // A non-retryable status was already thrown as PriceSourceError above;
       // rethrow it rather than burning the remaining attempts on it.

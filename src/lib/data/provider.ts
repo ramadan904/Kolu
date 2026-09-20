@@ -54,11 +54,19 @@ export function makeFixtureSource(now?: () => Date): ResolvedSource {
  */
 const pythSources = new Map<string, PythSource>();
 
+/** Whether a Hermes credential is configured. Never returns the key itself. */
+export function hasPythApiKey(): boolean {
+  return Boolean(process.env.PYTH_API_KEY?.trim());
+}
+
 function sharedPythSource(): PythSource {
   const endpoint = process.env.PYTH_HERMES_ENDPOINT ?? "";
   let source = pythSources.get(endpoint);
   if (!source) {
-    source = new PythSource({ endpoint: endpoint || undefined });
+    source = new PythSource({
+      endpoint: endpoint || undefined,
+      apiKey: process.env.PYTH_API_KEY,
+    });
     pythSources.set(endpoint, source);
   }
   return source;

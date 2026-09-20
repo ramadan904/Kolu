@@ -123,8 +123,9 @@ Deploying: see **[DEPLOY.md](DEPLOY.md)** — Vercel via GitHub Actions (with a
 health smoke test that fails the job on an unhealthy deploy), or the Dockerfile
 for anywhere else. No environment variable is required to boot.
 
-No API key, no wallet, no RPC. Pyth's Hermes endpoint is public and needs no
-auth. **If it is unreachable — locked-down wifi, a corporate proxy, an offline
+No wallet, no RPC. For **live** prices set `PYTH_API_KEY` — Pyth began
+requiring authentication on Hermes in August 2026, and without a key the board
+runs on labelled demo data instead (see [DEPLOY.md](DEPLOY.md)). **If it is unreachable — locked-down wifi, a corporate proxy, an offline
 demo machine — the app falls back to deterministic fixture data and says so in
 a banner on screen.** It never passes demo numbers off as live prices.
 

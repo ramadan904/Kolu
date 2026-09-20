@@ -8,7 +8,7 @@
  * a basis number that looks tradeable and is not.
  */
 
-import { fetchJsonWithRetry } from "./http";
+import { fetchJsonWithRetry, shortenUrl } from "./http";
 import type {
   FeedDescriptor,
   PriceReading,
@@ -54,6 +54,12 @@ export interface PythSourceOptions {
   /** Attempts per request, including the first. Default 3. */
   attempts?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Hermes has required authentication since August 2026. Without a key the
+   * price endpoints return 401 while feed lookup still works, so the app
+   * resolves every symbol and then cannot read a single price.
+   */
+  apiKey?: string;
 }
 
 /**
@@ -77,6 +83,7 @@ export class PythSource implements PriceSource {
   private readonly negativeTtlMs: number;
   private readonly attempts: number;
   private readonly sleep?: (ms: number) => Promise<void>;
+  private readonly apiKey: string | null;
 
   constructor(options: PythSourceOptions = {}) {
     this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
@@ -85,14 +92,22 @@ export class PythSource implements PriceSource {
     this.negativeTtlMs = options.negativeTtlMs ?? 10 * 60_000;
     this.attempts = options.attempts ?? 3;
     this.sleep = options.sleep;
+    this.apiKey = options.apiKey?.trim() || null;
+  }
+
+  /** True when a key is configured, for diagnostics. Never exposes the key. */
+  get authenticated(): boolean {
+    return this.apiKey !== null;
   }
 
   private async getJson(path: string): Promise<unknown> {
-    return fetchJsonWithRetry(`${this.endpoint}${path}`, `Hermes ${path}`, {
+    const url = `${this.endpoint}${path}`;
+    return fetchJsonWithRetry(url, `Hermes ${shortenUrl(url)}`, {
       fetchImpl: this.fetchImpl,
       timeoutMs: this.timeoutMs,
       attempts: this.attempts,
       sleep: this.sleep,
+      headers: this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : undefined,
     });
   }
 

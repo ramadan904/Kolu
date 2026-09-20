@@ -38,6 +38,50 @@ describe("queryKeyFor", () => {
   });
 });
 
+describe("PythSource authentication", () => {
+  it("sends a bearer token when a key is configured", async () => {
+    const seen: (HeadersInit | undefined)[] = [];
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      seen.push(init?.headers);
+      if (String(url).includes("price_feeds")) {
+        return new Response(
+          JSON.stringify([
+            { id: "0xaa", attributes: { symbol: "Equity.US.AAPL/USD" } },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ parsed: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const source = new PythSource({ fetchImpl, apiKey: "test-key" });
+    expect(source.authenticated).toBe(true);
+    await source.getLatest(["Equity.US.AAPL/USD"]);
+
+    for (const headers of seen) {
+      expect((headers as Record<string, string>).authorization).toBe("Bearer test-key");
+    }
+  });
+
+  it("sends no Authorization header when no key is set", async () => {
+    let seen: HeadersInit | undefined;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      seen = init?.headers;
+      return new Response("[]", { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const source = new PythSource({ fetchImpl });
+    expect(source.authenticated).toBe(false);
+    await source.resolveFeeds(["Equity.US.AAPL/USD"]);
+    expect((seen as Record<string, string>).authorization).toBeUndefined();
+  });
+
+  it("treats blank and whitespace keys as absent", () => {
+    expect(new PythSource({ apiKey: "" }).authenticated).toBe(false);
+    expect(new PythSource({ apiKey: "   " }).authenticated).toBe(false);
+  });
+});
+
 describe("PythSource.resolveFeeds", () => {
   it("resolves both legs of a pair from a single request", async () => {
     const { fetchImpl, queries } = makeHermes();

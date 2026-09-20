@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildBoard } from "@/lib/board";
-import { configuredMode, configuredScenario } from "@/lib/data/provider";
+import { configuredMode, configuredScenario, hasPythApiKey } from "@/lib/data/provider";
 import { executionReady, loadMints } from "@/lib/mints";
 import {
   CORE_UNIVERSE,
@@ -69,6 +69,10 @@ export async function GET() {
         fallbackReason: board?.fallbackReason ?? null,
         scenario: board?.source === "fixture" ? (board.scenario ?? configuredScenario()) : null,
         hermesEndpoint: process.env.PYTH_HERMES_ENDPOINT ?? "https://hermes.pyth.network",
+        // Hermes has required a key since August 2026. Without one, feed
+        // lookup still succeeds and every price request 401s — which looks
+        // like a working integration serving no data.
+        apiKeyConfigured: hasPythApiKey(),
       },
       // The naming that cannot be verified without calling Hermes, echoed back
       // so a mismatch is diagnosable from the deployment itself.

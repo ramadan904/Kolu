@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchJsonWithRetry, isRetryableStatus } from "@/lib/data/http";
+import { fetchJsonWithRetry, isRetryableStatus, shortenUrl } from "@/lib/data/http";
 
 const noSleep = async () => {};
 
@@ -98,5 +98,53 @@ describe("fetchJsonWithRetry", () => {
         sleep: noSleep,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("error messages", () => {
+  it("explains a 401 instead of printing a bare number", async () => {
+    // Hermes began requiring an API key in August 2026. A deployment that hits
+    // this needs the remedy, not the status code.
+    const { fetchImpl } = responder([401]);
+    await expect(
+      fetchJsonWithRetry("https://x/y", "Hermes", { fetchImpl, sleep: noSleep }),
+    ).rejects.toThrow(/PYTH_API_KEY/);
+  });
+
+  it("does not retry an auth failure", async () => {
+    const { fetchImpl, calls } = responder([401]);
+    await expect(
+      fetchJsonWithRetry("https://x/y", "ctx", { fetchImpl, sleep: noSleep }),
+    ).rejects.toThrow();
+    expect(calls()).toBe(1);
+  });
+
+  it("sends an Authorization header when given one", async () => {
+    let seen: HeadersInit | undefined;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      seen = init?.headers;
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await fetchJsonWithRetry("https://x/y", "ctx", {
+      fetchImpl,
+      headers: { authorization: "Bearer secret" },
+    });
+    expect((seen as Record<string, string>).authorization).toBe("Bearer secret");
+  });
+});
+
+describe("shortenUrl", () => {
+  it("collapses a wall of feed ids into a count", () => {
+    const ids = Array.from({ length: 24 }, (_, i) => `ids[]=${String(i).repeat(64)}`).join("&");
+    const short = shortenUrl(`https://hermes.test/v2/updates/price/latest?${ids}`);
+    expect(short).toContain("24 feeds");
+    expect(short.length).toBeLessThan(80);
+  });
+
+  it("leaves a short url alone", () => {
+    expect(shortenUrl("https://hermes.test/v2/price_feeds?query=AAPL")).toBe(
+      "https://hermes.test/v2/price_feeds?query=AAPL",
+    );
   });
 });
