@@ -5,7 +5,7 @@
 import { computeBasis, rankByDislocation, type BasisReading } from "./basis/compute";
 import { makeFixtureSource, resolveSource } from "./data/provider";
 import type { Scenario } from "./data/fixtures";
-import { PriceSourceError, type PriceReading } from "./data/types";
+import type { PriceReading } from "./data/types";
 import { record } from "./history";
 import { getMarketSession, type MarketSession } from "./market/session";
 import { CORE_UNIVERSE, UNIVERSE, symbolsFor, type UniverseEntry } from "./universe";
@@ -17,6 +17,20 @@ export interface BoardSummary {
   widestTicker: string | null;
 }
 
+/**
+ * Why the board is not showing live prices.
+ *
+ * `unreachable` is an outage: the oracle could not be contacted, so demo data
+ * keeps the page useful and the banner says the numbers are not live.
+ *
+ * `no_feeds` is a configuration error: the oracle answered perfectly well and
+ * none of the symbols we asked for exist. Substituting demo data there would
+ * paper over the bug with numbers that look plausible, so it does not. The
+ * board stays empty and says what is wrong. Different failures, opposite
+ * treatment.
+ */
+export type DegradedKind = "unreachable" | "no_feeds";
+
 export interface BoardSnapshot {
   generatedAt: string;
   session: MarketSession;
@@ -24,6 +38,9 @@ export interface BoardSnapshot {
   /** True when the live source failed and fixtures were substituted. */
   fellBack: boolean;
   fallbackReason: string | null;
+  degraded: DegradedKind | null;
+  /** Symbols requested from the oracle, for diagnosing a naming mismatch. */
+  requestedSymbols: string[];
   scenario: Scenario | null;
   readings: BasisReading[];
   summary: BoardSummary;
@@ -78,19 +95,25 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
   let prices: Map<string, PriceReading>;
   let fellBack = false;
   let fallbackReason: string | null = null;
+  let degraded: DegradedKind | null = null;
 
   try {
     prices = await resolved.source.getLatest(symbols);
-    if (prices.size === 0 && resolved.mode === "pyth") {
-      throw new PriceSourceError("Hermes returned no prices for the requested feeds");
-    }
   } catch (err) {
     if (resolved.mode === "fixture") throw err;
     fellBack = true;
+    degraded = "unreachable";
     fallbackReason =
       err instanceof Error ? err.message : "Live price source was unreachable";
     resolved = makeFixtureSource(clock);
     prices = await resolved.source.getLatest(symbols);
+  }
+
+  if (!fellBack && resolved.mode === "pyth" && prices.size === 0) {
+    // Reachable, and nothing we asked for exists. Do not invent a board.
+    degraded = "no_feeds";
+    fallbackReason =
+      "The oracle responded but none of the requested symbols resolved. The tokenized-symbol naming is probably wrong — see /api/health.";
   }
 
   const readings = rankByDislocation(
@@ -115,6 +138,8 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
     source: resolved.mode,
     fellBack,
     fallbackReason,
+    degraded,
+    requestedSymbols: symbols,
     scenario: resolved.scenario,
     readings,
     summary: summarise(readings),

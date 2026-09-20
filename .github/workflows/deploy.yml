@@ -1,0 +1,79 @@
+name: Deploy
+
+# Requires three repository secrets:
+#   VERCEL_TOKEN      — https://vercel.com/account/tokens
+#   VERCEL_ORG_ID     — from .vercel/project.json after `vercel link`
+#   VERCEL_PROJECT_ID — likewise
+# With those set, every push to the default branch ships to production and
+# every other branch gets a preview URL posted in the job summary.
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      # Never ship a build that does not pass its own suite.
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Guard — deploy secrets present
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN is not set. See DEPLOY.md for the three secrets this needs."
+            exit 1
+          fi
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PROD: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}
+        run: |
+          npx --yes vercel@latest pull --yes \
+            --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} \
+            --token=${{ secrets.VERCEL_TOKEN }}
+          npx --yes vercel@latest build $PROD --token=${{ secrets.VERCEL_TOKEN }}
+          URL=$(npx --yes vercel@latest deploy --prebuilt $PROD --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### Deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test the deployment
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          echo "Checking $URL/api/health"
+          STATUS=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors "$URL/api/health" | node -e "
+            let raw=''; process.stdin.on('data',d=>raw+=d).on('end',()=>{
+              const h=JSON.parse(raw);
+              console.log(h.status);
+              console.error(JSON.stringify(h, null, 2));
+            });
+          ")
+          echo "health status: $STATUS"
+          echo "health: \`$STATUS\`" >> "$GITHUB_STEP_SUMMARY"
+          # no_feeds means the symbol naming is wrong — that must not pass as a
+          # good deploy, because the board will be empty for every visitor.
+          if [ "$STATUS" = "no_feeds" ] || [ "$STATUS" = "error" ]; then
+            echo "::error::Deployment is up but unhealthy ($STATUS). Check /api/health."
+            exit 1
+          fi

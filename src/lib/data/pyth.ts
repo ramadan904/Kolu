@@ -8,6 +8,7 @@
  * a basis number that looks tradeable and is not.
  */
 
+import { fetchJsonWithRetry } from "./http";
 import type {
   FeedDescriptor,
   PriceReading,
@@ -50,6 +51,9 @@ export interface PythSourceOptions {
   timeoutMs?: number;
   /** How long to remember that a symbol has no feed. Default 10 minutes. */
   negativeTtlMs?: number;
+  /** Attempts per request, including the first. Default 3. */
+  attempts?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -71,33 +75,25 @@ export class PythSource implements PriceSource {
   /** symbol -> when we last confirmed Hermes has no feed for it. */
   private readonly negativeCache = new Map<string, number>();
   private readonly negativeTtlMs: number;
+  private readonly attempts: number;
+  private readonly sleep?: (ms: number) => Promise<void>;
 
   constructor(options: PythSourceOptions = {}) {
     this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 8000;
     this.negativeTtlMs = options.negativeTtlMs ?? 10 * 60_000;
+    this.attempts = options.attempts ?? 3;
+    this.sleep = options.sleep;
   }
 
   private async getJson(path: string): Promise<unknown> {
-    const url = `${this.endpoint}${path}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const res = await this.fetchImpl(url, {
-        signal: controller.signal,
-        headers: { accept: "application/json" },
-      });
-      if (!res.ok) {
-        throw new PriceSourceError(`Hermes ${res.status} for ${path}`);
-      }
-      return await res.json();
-    } catch (err) {
-      if (err instanceof PriceSourceError) throw err;
-      throw new PriceSourceError(`Hermes request failed for ${path}`, err);
-    } finally {
-      clearTimeout(timer);
-    }
+    return fetchJsonWithRetry(`${this.endpoint}${path}`, `Hermes ${path}`, {
+      fetchImpl: this.fetchImpl,
+      timeoutMs: this.timeoutMs,
+      attempts: this.attempts,
+      sleep: this.sleep,
+    });
   }
 
   /**

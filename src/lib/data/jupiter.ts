@@ -9,6 +9,7 @@
  * transaction, and holds no key material.
  */
 
+import { fetchJsonWithRetry } from "./http";
 import { PriceSourceError } from "./types";
 
 const DEFAULT_ENDPOINT = "https://lite-api.jup.ag";
@@ -53,12 +54,23 @@ export class JupiterSource implements QuoteSource {
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
 
+  private readonly attempts: number;
+  private readonly sleep?: (ms: number) => Promise<void>;
+
   constructor(
-    options: { endpoint?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+    options: {
+      endpoint?: string;
+      fetchImpl?: typeof fetch;
+      timeoutMs?: number;
+      attempts?: number;
+      sleep?: (ms: number) => Promise<void>;
+    } = {},
   ) {
     this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 8000;
+    this.attempts = options.attempts ?? 3;
+    this.sleep = options.sleep;
   }
 
   async getQuote(request: QuoteRequest): Promise<RouteQuote> {
@@ -73,25 +85,16 @@ export class JupiterSource implements QuoteSource {
       slippageBps: String(request.slippageBps ?? 50),
     });
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-
-    let body: unknown;
-    try {
-      const res = await this.fetchImpl(`${this.endpoint}/swap/v1/quote?${params}`, {
-        signal: controller.signal,
-        headers: { accept: "application/json" },
-      });
-      if (!res.ok) {
-        throw new PriceSourceError(`Jupiter quote returned ${res.status}`);
-      }
-      body = await res.json();
-    } catch (err) {
-      if (err instanceof PriceSourceError) throw err;
-      throw new PriceSourceError("Jupiter quote request failed", err);
-    } finally {
-      clearTimeout(timer);
-    }
+    const body = await fetchJsonWithRetry(
+      `${this.endpoint}/swap/v1/quote?${params}`,
+      "Jupiter quote",
+      {
+        fetchImpl: this.fetchImpl,
+        timeoutMs: this.timeoutMs,
+        attempts: this.attempts,
+        sleep: this.sleep,
+      },
+    );
 
     const rec = asRecord(body, "Jupiter quote");
 

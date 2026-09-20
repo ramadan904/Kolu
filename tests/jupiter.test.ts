@@ -58,15 +58,38 @@ describe("JupiterSource", () => {
     ).rejects.toThrow(/priceImpactPct/);
   });
 
-  it("surfaces a non-200 as an error", async () => {
-    const fetchImpl = (async () => new Response("nope", { status: 429 })) as unknown as typeof fetch;
+  it("surfaces a permanent failure immediately", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls += 1;
+      return new Response("nope", { status: 400 });
+    }) as unknown as typeof fetch;
+
     await expect(
       new JupiterSource({ fetchImpl }).getQuote({
         inputMint: "A".repeat(43),
         outputMint: "B".repeat(43),
         amount: 1n,
       }),
-    ).rejects.toThrow(/429/);
+    ).rejects.toThrow(/400/);
+    expect(calls).toBe(1);
+  });
+
+  it("retries a rate limit before giving up", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls += 1;
+      if (calls < 3) return new Response("slow down", { status: 429 });
+      return new Response(JSON.stringify(QUOTE), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const quote = await new JupiterSource({ fetchImpl, sleep: async () => {} }).getQuote({
+      inputMint: "A".repeat(43),
+      outputMint: "B".repeat(43),
+      amount: 1n,
+    });
+    expect(quote.priceImpactBps).toBeCloseTo(23, 6);
+    expect(calls).toBe(3);
   });
 
   it("rejects a non-positive amount before making a request", async () => {

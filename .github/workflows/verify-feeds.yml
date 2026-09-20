@@ -1,0 +1,43 @@
+name: Verify Pyth feeds
+
+# Answers the one question that cannot be settled without network access: what
+# the tokenized twins are actually called on Hermes. Runs on GitHub's runners,
+# which have real internet, and puts the answer in the job summary.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekdays shortly after the US open, when equity feeds are certainly live.
+    - cron: "45 13 * * 1-5"
+  push:
+    paths:
+      - "src/lib/universe.ts"
+      - "src/lib/data/pyth.ts"
+      - "scripts/sync-feeds.ts"
+      - ".github/workflows/verify-feeds.yml"
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Resolve feeds against live Hermes
+        env:
+          PYTH_HERMES_ENDPOINT: ${{ vars.PYTH_HERMES_ENDPOINT || 'https://hermes.pyth.network' }}
+          # Override here to test a different naming convention without editing code.
+          KOLU_TOKEN_SYMBOL_TEMPLATE: ${{ vars.KOLU_TOKEN_SYMBOL_TEMPLATE }}
+        run: npm run sync-feeds
+
+      - name: Upload resolved feed map
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feeds
+          path: config/feeds.json
+          if-no-files-found: warn

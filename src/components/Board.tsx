@@ -148,6 +148,12 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
     ...board.readings.map((r) => Math.abs(r.basisBps ?? 0)),
   );
 
+  // Every pair missing a leg is a different failure from a quiet market, and it
+  // needs saying rather than rendering twelve rows of em-dashes.
+  const noFeeds =
+    board.degraded !== "no_feeds" &&
+    (board.readings.length === 0 || board.readings.every((r) => r.signal === "unavailable"));
+
   return (
     <div className="space-y-5">
       <div
@@ -176,6 +182,28 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
         </div>
       </div>
 
+      {board.degraded === "no_feeds" && (
+        <div
+          className="card px-4 py-3 text-sm"
+          style={{ borderColor: "var(--status-critical)" }}
+        >
+          <span style={{ color: "var(--status-critical)" }} aria-hidden="true">
+            {"▲"}{" "}
+          </span>
+          <strong>Misconfigured, not offline.</strong> The oracle answered and none
+          of the requested symbols exist. Demo data is deliberately withheld here —
+          showing it would hide this.{" "}
+          <span style={{ color: "var(--text-muted)" }}>
+            Asked for {board.requestedSymbols.slice(0, 2).join(", ")}
+            {board.requestedSymbols.length > 2
+              ? ` and ${board.requestedSymbols.length - 2} more`
+              : ""}
+            . Set KOLU_TOKEN_SYMBOL_TEMPLATE to the naming the oracle publishes;
+            /api/health lists exactly what is being requested.
+          </span>
+        </div>
+      )}
+
       {(board.fellBack || error) && (
         <div
           className="card px-4 py-3 text-sm"
@@ -196,6 +224,23 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
               <strong>Stale.</strong> {error} — showing the last board that loaded.
             </>
           )}
+        </div>
+      )}
+
+      {noFeeds && (
+        <div className="card px-4 py-3 text-sm" style={{ borderColor: "var(--status-warning)" }}>
+          <span style={{ color: "var(--status-warning)" }} aria-hidden="true">
+            {"\u25B2"}{" "}
+          </span>
+          <strong>No price feeds resolved.</strong>{" "}
+          {board.readings.length === 0
+            ? "The tracked universe is empty."
+            : "Every pair is missing at least one leg, so there is nothing to compare."}{" "}
+          <span style={{ color: "var(--text-muted)" }}>
+            This usually means the tokenized-symbol naming does not match what the
+            oracle publishes. Check <code>/api/health</code> for the symbols being
+            requested.
+          </span>
         </div>
       )}
 

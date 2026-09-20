@@ -9,6 +9,37 @@ after costs, and tells you whether it can be hedged or only bet on.
 
 Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
 
+**[Open the live board](#)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
+
+---
+
+## Judge path — 90 seconds
+
+1. **Open the board.** Read the session strip first: it says whether US equities
+   are open, and every number below means something different depending on that.
+   The third tile answers *Can it be hedged?* — while the market is shut, no.
+
+2. **Read the top row.** Widest dislocation, in percent and bps. The bar
+   diverges around zero: warm is a premium, cool is a discount. The grey band
+   around zero is the two oracles' combined confidence — anything that fails to
+   escape it is greyed out and labelled *Within noise*, because it is not signal.
+
+3. **Expand that row.** The chart is the thesis. Shaded = the underlying market
+   was shut. The basis sits pinned near zero through the session, opens the
+   moment the market closes, and collapses at the next open.
+
+4. **Look at the cost breakdown.** Gross gap, swap fees per leg, price impact,
+   network cost, and what survives. Then the caveat: on a closed market it reads
+   **Directional, not an arbitrage** — there is no short leg available, so this
+   is a bet on convergence. That number is never shown in confident green.
+
+5. **Arm an alert.** Alerts → threshold → Arm. It fires on the next poll. What
+   matters is what it refuses to fire on: a gap inside the noise floor, or one
+   measured against a feed that has stopped ticking.
+
+6. **Check `/api/health`** if you want to know whether you are looking at live
+   oracle data or labelled demo data. It says so explicitly.
+
 ---
 
 ## Why this can't be built off-chain
@@ -88,6 +119,10 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
+Deploying: see **[DEPLOY.md](DEPLOY.md)** — Vercel via GitHub Actions (with a
+health smoke test that fails the job on an unhealthy deploy), or the Dockerfile
+for anywhere else. No environment variable is required to boot.
+
 No API key, no wallet, no RPC. Pyth's Hermes endpoint is public and needs no
 auth. **If it is unreachable — locked-down wifi, a corporate proxy, an offline
 demo machine — the app falls back to deterministic fixture data and says so in
@@ -109,10 +144,22 @@ KOLU_PRICE_SOURCE=fixture KOLU_SCENARIO=weekend_drift npm run dev
 Other commands:
 
 ```bash
-npm test             # 95 tests
+npm test             # 104 tests
 npm run typecheck
-npm run sync-feeds   # report which Pyth feeds actually exist for the universe
+npm run sync-feeds   # resolve the universe against live Hermes and report
 ```
+
+`sync-feeds` is how the one unverifiable claim in this repo gets settled. The
+tokenized twins are assumed to be `Crypto.<TICKER>X/USD`; when a token symbol
+does not resolve, the script prints every symbol Hermes actually publishes for
+that ticker, so the real convention is read off the output rather than guessed.
+It also runs in CI — Actions → **Verify Pyth feeds**.
+
+If the naming is different, it is an environment variable
+(`KOLU_TOKEN_SYMBOL_TEMPLATE`), not a code change. And it fails loudly: an
+oracle that answers with none of our symbols shows *"Misconfigured, not
+offline"* and **refuses to substitute demo data**, because plausible fake
+numbers would hide the bug.
 
 ## How it's built
 
@@ -138,7 +185,7 @@ the trade of the year.
 
 ### Tests
 
-95 tests, covering the parts where being quietly wrong is expensive:
+104 tests, covering the parts where being quietly wrong is expensive:
 
 - DST transitions, half-day 13:00 closes, holiday tables, ET-vs-UTC date keying
 - The noise floor, and the stale-vs-degraded split
@@ -154,7 +201,9 @@ the trade of the year.
 - Feed resolution: one request per pair rather than per symbol, misses cached
   so the board stops re-asking, and exact-symbol matching preserved throughout
 - Every condition an alert must stay silent on
-- The live-source failure path, end to end
+- Retry and backoff: rate limits retried, permanent failures not
+- The live-source failure path, end to end, and the misconfiguration path
+  against a stub oracle that resolves nothing
 
 ## Enabling measured quotes
 

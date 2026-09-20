@@ -43,11 +43,33 @@ export function makeFixtureSource(now?: () => Date): ResolvedSource {
   };
 }
 
+/**
+ * One PythSource per endpoint, for the life of the process.
+ *
+ * This is not a micro-optimisation. The resolved-feed cache and the negative
+ * cache live on the instance, so constructing a new one per board build threw
+ * both away and re-resolved every symbol from scratch on every rebuild — the
+ * exact request storm those caches exist to prevent. Measured before the fix:
+ * 13 resolution requests per rebuild, forever. After: 13 once.
+ */
+const pythSources = new Map<string, PythSource>();
+
+function sharedPythSource(): PythSource {
+  const endpoint = process.env.PYTH_HERMES_ENDPOINT ?? "";
+  let source = pythSources.get(endpoint);
+  if (!source) {
+    source = new PythSource({ endpoint: endpoint || undefined });
+    pythSources.set(endpoint, source);
+  }
+  return source;
+}
+
+/** Drops the shared sources, so a test can start from a cold cache. */
+export function resetSources(): void {
+  pythSources.clear();
+}
+
 export function resolveSource(now?: () => Date): ResolvedSource {
   if (configuredMode() === "fixture") return makeFixtureSource(now);
-  return {
-    source: new PythSource({ endpoint: process.env.PYTH_HERMES_ENDPOINT }),
-    mode: "pyth",
-    scenario: null,
-  };
+  return { source: sharedPythSource(), mode: "pyth", scenario: null };
 }

@@ -31,39 +31,99 @@ export interface UniverseEntry {
   mint: string | null;
 }
 
-function entry(
+/**
+ * How a ticker becomes a Pyth symbol.
+ *
+ * These are templates rather than literals because the tokenized-twin naming is
+ * the one thing about this integration that cannot be verified without calling
+ * Hermes. If the convention differs from `Crypto.AAPLX/USD`, that must be a
+ * configuration change on a running deployment — not a code edit and a
+ * redeploy. `{TICKER}` is replaced with the underlying ticker, `{TOKEN}` with
+ * the tokenized ticker.
+ *
+ * `npm run sync-feeds` reports which template actually resolves.
+ */
+export const DEFAULT_EQUITY_TEMPLATE = "Equity.US.{TICKER}/USD";
+export const DEFAULT_TOKEN_TEMPLATE = "Crypto.{TOKEN}/USD";
+export const DEFAULT_TOKEN_TICKER_TEMPLATE = "{TICKER}X";
+
+function template(envVar: string, fallback: string): string {
+  const value = process.env[envVar]?.trim();
+  return value && value.length > 0 ? value : fallback;
+}
+
+export function applyTemplate(
+  tpl: string,
   ticker: string,
-  name: string,
-  tier: Tier,
-): UniverseEntry {
-  const tokenTicker = `${ticker}X`;
-  return {
+  tokenTicker: string,
+): string {
+  return tpl.replaceAll("{TICKER}", ticker).replaceAll("{TOKEN}", tokenTicker);
+}
+
+export function tokenTickerFor(ticker: string): string {
+  return applyTemplate(
+    template("KOLU_TOKEN_TICKER_TEMPLATE", DEFAULT_TOKEN_TICKER_TEMPLATE),
     ticker,
-    name,
+    "",
+  );
+}
+
+export function symbolsForTicker(ticker: string): {
+  tokenTicker: string;
+  equitySymbol: string;
+  tokenSymbol: string;
+} {
+  const tokenTicker = tokenTickerFor(ticker);
+  return {
     tokenTicker,
-    equitySymbol: `Equity.US.${ticker}/USD`,
-    tokenSymbol: `Crypto.${tokenTicker}/USD`,
-    tier,
-    mint: null,
+    equitySymbol: applyTemplate(
+      template("KOLU_EQUITY_SYMBOL_TEMPLATE", DEFAULT_EQUITY_TEMPLATE),
+      ticker,
+      tokenTicker,
+    ),
+    tokenSymbol: applyTemplate(
+      template("KOLU_TOKEN_SYMBOL_TEMPLATE", DEFAULT_TOKEN_TEMPLATE),
+      ticker,
+      tokenTicker,
+    ),
   };
 }
 
-export const UNIVERSE: UniverseEntry[] = [
-  entry("TSLA", "Tesla", "core"),
-  entry("NVDA", "NVIDIA", "core"),
-  entry("SPY", "S&P 500 ETF", "core"),
-  entry("AAPL", "Apple", "core"),
-  entry("QQQ", "Nasdaq 100 ETF", "core"),
-  entry("MSFT", "Microsoft", "extended"),
-  entry("META", "Meta Platforms", "extended"),
-  entry("AMZN", "Amazon", "extended"),
-  entry("GOOGL", "Alphabet", "extended"),
-  entry("COIN", "Coinbase", "extended"),
-  entry("MSTR", "MicroStrategy", "extended"),
-  entry("CRCL", "Circle", "extended"),
+function entry(ticker: string, name: string, tier: Tier): UniverseEntry {
+  const { tokenTicker, equitySymbol, tokenSymbol } = symbolsForTicker(ticker);
+  return { ticker, name, tokenTicker, equitySymbol, tokenSymbol, tier, mint: null };
+}
+
+const TICKERS: [string, string, Tier][] = [
+  ["TSLA", "Tesla", "core"],
+  ["NVDA", "NVIDIA", "core"],
+  ["SPY", "S&P 500 ETF", "core"],
+  ["AAPL", "Apple", "core"],
+  ["QQQ", "Nasdaq 100 ETF", "core"],
+  ["MSFT", "Microsoft", "extended"],
+  ["META", "Meta Platforms", "extended"],
+  ["AMZN", "Amazon", "extended"],
+  ["GOOGL", "Alphabet", "extended"],
+  ["COIN", "Coinbase", "extended"],
+  ["MSTR", "MicroStrategy", "extended"],
+  ["CRCL", "Circle", "extended"],
 ];
 
+/**
+ * Built once per process. Templates come from the environment, which on a
+ * serverless host is fixed for the lifetime of an instance, so rebuilding per
+ * request would only cost work.
+ */
+export const UNIVERSE: UniverseEntry[] = TICKERS.map(([ticker, name, tier]) =>
+  entry(ticker, name, tier),
+);
+
 export const CORE_UNIVERSE = UNIVERSE.filter((u) => u.tier === "core");
+
+/** Rebuilds the universe from the current environment. For tests. */
+export function buildUniverse(): UniverseEntry[] {
+  return TICKERS.map(([ticker, name, tier]) => entry(ticker, name, tier));
+}
 
 export function findEntry(ticker: string): UniverseEntry | undefined {
   const needle = ticker.toUpperCase();

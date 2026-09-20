@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildBoard, clearBoardCache } from "@/lib/board";
 import { FixtureSource } from "@/lib/data/fixtures";
@@ -82,12 +84,39 @@ describe("buildBoard", () => {
     expect(board.readings.some((r) => r.signal === "degraded_feed")).toBe(true);
   });
 
+  it("refuses to show demo data when the oracle answers but nothing resolves", async () => {
+    // A reachable oracle that knows none of our symbols is a configuration bug.
+    // Substituting fixtures would hide it behind plausible-looking numbers.
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("[]");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+
+    process.env.KOLU_PRICE_SOURCE = "pyth";
+    process.env.PYTH_HERMES_ENDPOINT = `http://127.0.0.1:${port}`;
+
+    try {
+      const board = await buildBoard({ now: WEEKEND });
+      expect(board.degraded).toBe("no_feeds");
+      expect(board.fellBack).toBe(false);
+      expect(board.source).toBe("pyth");
+      expect(board.readings.every((r) => r.signal === "unavailable")).toBe(true);
+      expect(board.fallbackReason).toContain("naming");
+      expect(board.requestedSymbols.length).toBeGreaterThan(0);
+    } finally {
+      server.close();
+    }
+  });
+
   it("falls back to fixtures and says so when the live source is unreachable", async () => {
     process.env.KOLU_PRICE_SOURCE = "pyth";
     process.env.PYTH_HERMES_ENDPOINT = "http://127.0.0.1:1";
     const board = await buildBoard({ now: WEEKEND });
 
     expect(board.fellBack).toBe(true);
+    expect(board.degraded).toBe("unreachable");
     expect(board.source).toBe("fixture");
     expect(board.fallbackReason).toBeTruthy();
     expect(board.readings.length).toBe(CORE_UNIVERSE.length);
