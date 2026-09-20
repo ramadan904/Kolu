@@ -216,7 +216,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
       <Portfolio readings={board.readings} mints={mints} />
 
-      <Hero reading={headline} hedgeable={hedgeable} onTrade={setSelected} />
+      <Hero
+        reading={headline}
+        hedgeable={hedgeable}
+        session={board.session}
+        onTrade={setSelected}
+      />
 
       <ArmedStrip
         rules={rules}

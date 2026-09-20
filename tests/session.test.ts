@@ -3,6 +3,7 @@ import {
   getMarketSession,
   referenceQualityFor,
   regularCloseMinute,
+  timeUntilClose,
   toEasternParts,
 } from "@/lib/market/session";
 
@@ -112,5 +113,28 @@ describe("referenceQualityFor", () => {
     expect(referenceQualityFor("weekend")).toBe("stale");
     expect(referenceQualityFor("holiday")).toBe("stale");
     expect(referenceQualityFor("closed")).toBe("stale");
+  });
+});
+
+describe("timeUntilClose", () => {
+  it("counts down to the bell while the session is open", () => {
+    // Mon 10:00 ET, close at 16:00.
+    expect(timeUntilClose(at("2026-09-21T14:00:00Z"))).toBe("6 hours");
+    // Mon 15:20 ET.
+    expect(timeUntilClose(at("2026-09-21T19:20:00Z"))).toBe("40 minutes");
+    // Mon 13:45 ET.
+    expect(timeUntilClose(at("2026-09-21T17:45:00Z"))).toBe("2h 15m");
+  });
+
+  it("honours the early close on a half day", () => {
+    // Day after Thanksgiving, 12:30 ET, closes 13:00.
+    expect(timeUntilClose(at("2026-11-27T17:30:00Z"))).toBe("30 minutes");
+  });
+
+  it("is null whenever the market is not open", () => {
+    expect(timeUntilClose(at("2026-09-20T16:00:00Z"))).toBeNull(); // weekend
+    expect(timeUntilClose(at("2026-09-21T12:00:00Z"))).toBeNull(); // premarket
+    expect(timeUntilClose(at("2026-09-21T21:00:00Z"))).toBeNull(); // after hours
+    expect(timeUntilClose(at("2026-11-26T15:00:00Z"))).toBeNull(); // holiday
   });
 });

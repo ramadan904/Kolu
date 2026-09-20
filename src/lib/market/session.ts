@@ -219,3 +219,20 @@ export function referenceQualityFor(phase: SessionPhase): "live" | "thin" | "sta
   if (phase === "premarket" || phase === "afterhours") return "thin";
   return "stale";
 }
+
+/**
+ * Plain-language time until the continuous session ends.
+ *
+ * Null whenever the market is not open, or the boundary is not knowable — the
+ * calm-state copy promises the reader something specific, and a countdown that
+ * is confidently wrong is worse than none.
+ */
+export function timeUntilClose(session: MarketSession): string | null {
+  if (!session.isRegularHours || session.minutesToNextPhase === null) return null;
+  const minutes = session.minutesToNextPhase;
+  if (minutes <= 0) return null;
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} hours` : `${hours}h ${rest}m`;
+}
