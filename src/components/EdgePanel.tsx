@@ -11,10 +11,17 @@ interface QuoteState {
   status: "idle" | "loading" | "measured" | "unavailable";
   priceImpactBps: number | null;
   route: string[];
+  side: "buy" | "sell" | null;
   detail: string | null;
 }
 
-const IDLE: QuoteState = { status: "idle", priceImpactBps: null, route: [], detail: null };
+const IDLE: QuoteState = {
+  status: "idle",
+  priceImpactBps: null,
+  route: [],
+  side: null,
+  detail: null,
+};
 
 /**
  * The action surface. A gap is only interesting next to what it costs to touch
@@ -27,6 +34,8 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
   const [quote, setQuote] = useState<QuoteState>(IDLE);
 
   const hedgeable = reading.referenceQuality === "live";
+  // A token trading rich is sold, not bought.
+  const side: "buy" | "sell" = (reading.basisBps ?? 0) > 0 ? "sell" : "buy";
 
   // A measured route beats an assumption, so it wins whenever one is available.
   const impactBps = quote.status === "measured" && quote.priceImpactBps !== null
@@ -42,10 +51,13 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const res = await fetch(
-            `/api/quote?ticker=${reading.ticker}&notional=${notional}`,
-            { cache: "no-store" },
-          );
+          const query = new URLSearchParams({
+            ticker: reading.ticker,
+            notional: String(notional),
+            side,
+            price: String(reading.token?.price ?? 0),
+          });
+          const res = await fetch(`/api/quote?${query}`, { cache: "no-store" });
           const body = await res.json();
           if (cancelled) return;
 
@@ -54,6 +66,7 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
               status: "measured",
               priceImpactBps: Number(body.priceImpactBps),
               route: Array.isArray(body.route) ? body.route : [],
+              side: body.side === "sell" ? "sell" : "buy",
               detail: null,
             });
           } else {
@@ -61,6 +74,7 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
               status: "unavailable",
               priceImpactBps: null,
               route: [],
+              side: null,
               detail: typeof body.detail === "string" ? body.detail : null,
             });
           }
@@ -70,6 +84,7 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
               status: "unavailable",
               priceImpactBps: null,
               route: [],
+              side: null,
               detail: "The quote service could not be reached.",
             });
           }
@@ -81,7 +96,7 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [reading.ticker, notional]);
+  }, [reading.ticker, notional, side, reading.token?.price]);
 
   const edge = useMemo(() => {
     if (reading.basisBps === null) return null;
@@ -154,10 +169,10 @@ export function EdgePanel({ reading }: { reading: BasisReading }) {
               className="text-xs font-medium uppercase tracking-wide"
               style={{ color: "var(--text-muted)" }}
             >
-              Measured price impact
+              Measured price impact — {quote.side === "sell" ? "sell" : "buy"} leg
             </div>
             <div className="mt-1 text-lg font-semibold tnum">
-              {impactBps.toFixed(1)}bps
+              {impactBps.toFixed(1)}bps per leg
               <span
                 className="ml-2 text-xs font-normal"
                 style={{ color: "var(--status-good)" }}
