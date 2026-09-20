@@ -45,6 +45,13 @@ through the session, opens once the underlying market shuts, and collapses at
 the next open. A single number cannot tell you whether a dislocation is
 widening or already halfway closed.
 
+**Alerts that respect your sleep.** Arm a threshold per ticker and Kolu watches
+for you, in-page and via browser notification. What matters is what it refuses
+to fire on: a gap inside the oracle noise floor, or one measured against a feed
+that has stopped ticking, never alerts. A stalled reference manufactures an
+arbitrarily large apparent basis, and waking someone at 3am for a data outage
+dressed up as an opportunity is the fastest way to get the whole feature muted.
+
 **An action surface.** Set your size: gross gap, swap fees per leg, price
 impact, amortised network cost, and what survives. Price impact is a **measured
 route quote from Jupiter** when mints are configured, and your own assumption —
@@ -102,7 +109,7 @@ KOLU_PRICE_SOURCE=fixture KOLU_SCENARIO=weekend_drift npm run dev
 Other commands:
 
 ```bash
-npm test             # 69 tests
+npm test             # 95 tests
 npm run typecheck
 npm run sync-feeds   # report which Pyth feeds actually exist for the universe
 ```
@@ -114,9 +121,10 @@ src/lib/market/     NYSE calendar + session classification (DST, half days, holi
 src/lib/data/       Pyth Hermes adapter, Jupiter quotes, fixtures, source selection
 src/lib/basis/      Basis computation, noise floor, cost and edge model
 src/lib/history.ts  Basis history: in-process samples + modelled demo backfill
+src/lib/alerts.ts   Alert rules, and the conditions they refuse to fire on
 src/lib/mints.ts    Token registry, loaded from config rather than compiled in
 src/lib/board.ts    Assembles the ranked snapshot
-src/components/     Board, diverging bar, basis chart, edge panel, session strip
+src/components/     Board, diverging bar, basis chart, edge panel, alerts, session strip
 ```
 
 Next.js 15 (App Router), React 19, TypeScript, Tailwind v4. No wallet
@@ -130,7 +138,7 @@ the trade of the year.
 
 ### Tests
 
-69 tests, covering the parts where being quietly wrong is expensive:
+95 tests, covering the parts where being quietly wrong is expensive:
 
 - DST transitions, half-day 13:00 closes, holiday tables, ET-vs-UTC date keying
 - The noise floor, and the stale-vs-degraded split
@@ -143,6 +151,9 @@ the trade of the year.
   winner), and amounts past `Number.MAX_SAFE_INTEGER` surviving as `bigint`
 - Mint config rejecting placeholders and non-base58 strings
 - The shape of the modelled history, so the chart cannot silently invert
+- Feed resolution: one request per pair rather than per symbol, misses cached
+  so the board stops re-asking, and exact-symbol matching preserved throughout
+- Every condition an alert must stay silent on
 - The live-source failure path, end to end
 
 ## Enabling measured quotes

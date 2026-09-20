@@ -1,10 +1,20 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { BoardSnapshot } from "@/lib/board";
 import { formatAge } from "@/lib/basis/compute";
 import { fmtBps, fmtClock, fmtPct, fmtUsd } from "@/lib/format";
+import {
+  evaluate,
+  loadRules,
+  makeRule,
+  saveRules,
+  type AlertDirection,
+  type AlertHit,
+  type AlertRule,
+} from "@/lib/alerts";
 import type { HistorySeries } from "@/lib/history";
+import { AlertPanel } from "./AlertPanel";
 import { BasisBar } from "./BasisBar";
 import { BasisChart } from "./BasisChart";
 import { EdgePanel } from "./EdgePanel";
@@ -19,17 +29,86 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [fired, setFired] = useState<AlertHit[]>([]);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported",
+  );
+  // Rules are read inside the poll callback, which must not be rebuilt on every
+  // rule change or the poll interval would reset each time.
+  const rulesRef = useRef<AlertRule[]>([]);
 
-  const refresh = useCallback(async (which: "core" | "all") => {
-    try {
-      const res = await fetch(`/api/basis?tier=${which}`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Board request failed (${res.status})`);
-      setBoard(await res.json());
-      setError(null);
-    } catch (err) {
-      // Keep showing the last good board; say that it is no longer fresh.
-      setError(err instanceof Error ? err.message : "Refresh failed");
+  useEffect(() => {
+    const stored = loadRules();
+    setRules(stored);
+    rulesRef.current = stored;
+    if (typeof Notification !== "undefined") setPermission(Notification.permission);
+  }, []);
+
+  const applyRules = useCallback((snapshot: BoardSnapshot) => {
+    const current = rulesRef.current;
+    if (current.length === 0) return;
+
+    const { hits, rules: next } = evaluate(current, snapshot.readings, Date.now());
+    if (hits.length === 0) return;
+
+    rulesRef.current = next;
+    setRules(next);
+    saveRules(next);
+    setFired((prev) => [...hits, ...prev].slice(0, 20));
+
+    // Demo data must never masquerade as a live signal, including in a
+    // notification the viewer reads with the tab in the background.
+    const prefix = snapshot.fellBack ? "[demo] " : "";
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      for (const hit of hits) {
+        try {
+          new Notification(`${prefix}Kolu — ${hit.ticker}X`, { body: hit.message });
+        } catch {
+          // Some browsers reject constructed notifications outside a service
+          // worker; the in-page list still shows the hit.
+        }
+      }
     }
+  }, []);
+
+  const refresh = useCallback(
+    async (which: "core" | "all") => {
+      try {
+        const res = await fetch(`/api/basis?tier=${which}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Board request failed (${res.status})`);
+        const snapshot: BoardSnapshot = await res.json();
+        setBoard(snapshot);
+        setError(null);
+        applyRules(snapshot);
+      } catch (err) {
+        // Keep showing the last good board; say that it is no longer fresh.
+        setError(err instanceof Error ? err.message : "Refresh failed");
+      }
+    },
+    [applyRules],
+  );
+
+  const addRule = useCallback(
+    (ticker: string, thresholdBps: number, direction: AlertDirection) => {
+      const next = [...rulesRef.current, makeRule(ticker, thresholdBps, direction)];
+      rulesRef.current = next;
+      setRules(next);
+      saveRules(next);
+    },
+    [],
+  );
+
+  const removeRule = useCallback((id: string) => {
+    const next = rulesRef.current.filter((r) => r.id !== id);
+    rulesRef.current = next;
+    setRules(next);
+    saveRules(next);
+  }, []);
+
+  const requestPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") return;
+    setPermission(await Notification.requestPermission());
   }, []);
 
   useEffect(() => {
@@ -121,6 +200,16 @@ export function Board({ initial }: { initial: BoardSnapshot }) {
       )}
 
       <Tiles board={board} />
+
+      <AlertPanel
+        rules={rules}
+        tickers={board.readings.map((r) => r.ticker)}
+        recent={fired}
+        permission={permission}
+        onAdd={addRule}
+        onRemove={removeRule}
+        onRequestPermission={requestPermission}
+      />
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">

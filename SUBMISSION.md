@@ -116,8 +116,14 @@ never show that number in green."
 data right now because the live feed was unreachable from this machine — and it
 says so. It never passes modelled numbers off as live prices."
 
-**2:00 — The close.** "Four scenarios ship with it, so you can see a live
-dislocation, a calm market, or a stalled feed on demand. 69 tests. No wallet, no
+**2:00 — Alerts.** Arm one on SPYX at 50bps. It fires on the next poll. "The
+interesting gaps happen while you're asleep, so the design question is when this
+must *not* fire. A gap inside the noise floor doesn't. A stalled feed doesn't —
+that can manufacture any basis you like, and one false alarm at 3am gets the
+whole feature muted."
+
+**2:20 — The close.** "Four scenarios ship with it, so you can see a live
+dislocation, a calm market, or a stalled feed on demand. 95 tests. No wallet, no
 RPC, no API key — clone it and it runs." Cut to the repo.
 
 ---
@@ -129,8 +135,8 @@ Judges can check every line of this.
 **Working:** market session engine (DST, half-day closes, holiday calendar),
 Pyth Hermes adapter with runtime feed resolution, basis computation with the
 oracle noise floor, stale-vs-degraded classification, 48h history with
-closed-market shading, cost and edge model, the full board and action surface.
-69 tests. Falls back to labelled demo data when the live source is unreachable.
+closed-market shading, cost and edge model, threshold alerts, the full board and
+action surface. 95 tests. Falls back to labelled demo data when the live source is unreachable.
 
 **Built and tested against recorded responses, not yet run live:** the Jupiter
 quote path. It is quote-only — Kolu never builds, signs or sends a transaction,
