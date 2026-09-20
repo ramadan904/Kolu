@@ -29,6 +29,12 @@ export interface RouteQuote {
   priceImpactBps: number;
   /** AMMs the route passes through, for display. */
   route: string[];
+  /**
+   * Jupiter's own quote object, passed back verbatim when building the swap.
+   * It is opaque on purpose: re-deriving or editing any of it is how routes
+   * end up executing at a price the user never saw.
+   */
+  raw: unknown;
 }
 
 export interface QuoteSource {
@@ -124,7 +130,43 @@ export class JupiterSource implements QuoteSource {
       outAmount: asBigInt(rec.outAmount, "Jupiter quote outAmount"),
       priceImpactBps: Math.abs(impact) * 10_000,
       route,
+      raw: rec,
     };
+  }
+
+  /**
+   * Exchanges a quote for an unsigned transaction.
+   *
+   * The quote goes back exactly as Jupiter returned it. Kolu never signs, never
+   * holds a key, and never sees one — the returned base64 is handed to the
+   * user's wallet, which is the only thing that can authorise it.
+   */
+  async buildSwap(quote: unknown, userPublicKey: string): Promise<string> {
+    const res = await this.fetchImpl(`${this.endpoint}/swap/v1/swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey,
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: { priorityLevelWithMaxLamports: { priorityLevel: "medium", maxLamports: 4_000_000 } },
+      }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new PriceSourceError(
+        `Jupiter swap build returned ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`,
+      );
+    }
+
+    const body = asRecord(await res.json(), "Jupiter swap");
+    const tx = body.swapTransaction;
+    if (typeof tx !== "string" || tx.length === 0) {
+      throw new PriceSourceError("Jupiter swap: swapTransaction was missing");
+    }
+    return tx;
   }
 }
 

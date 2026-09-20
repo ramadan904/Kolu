@@ -1,93 +1,130 @@
 @import "tailwindcss";
 
 /*
- * Tokens come from the validated reference palette. The diverging pair carries
- * polarity only — premium (token rich) warm, discount (token cheap) cool — and
- * never good/bad. Status colours are reserved and always ship with a label, so
- * hue never carries meaning on its own.
+ * Kolu design tokens.
+ *
+ * Dark only. Near-neutral near-black, true white, one action accent, and a
+ * semantic pair for market direction. The pair is validated against the dark
+ * surface: lightness band, chroma floor, CVD separation (deutan ΔE 8.8) and
+ * contrast all pass. Direction is additionally carried by a sign and an arrow,
+ * never by hue alone.
  */
 :root {
-  color-scheme: light;
-  --surface-page: #f9f9f7;
-  --surface-1: #fcfcfb;
-  --surface-2: #f2f2ef;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-
-  --premium: #e34948;
-  --discount: #2a78d6;
-  --neutral-mid: #f0efec;
-
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --surface-page: #0d0d0d;
-    --surface-1: #131313;
-    --surface-2: #1c1c1b;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-
-    --premium: #e66767;
-    --discount: #3987e5;
-    --neutral-mid: #383835;
-  }
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --surface-page: #0d0d0d;
-  --surface-1: #131313;
-  --surface-2: #1c1c1b;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.1);
 
-  --premium: #e66767;
-  --discount: #3987e5;
-  --neutral-mid: #383835;
+  --bg: #08080a;
+  --surface: #0e0e11;
+  --raised: #16161a;
+  --hover: #1c1c21;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  --text: #ffffff;
+  --text-2: #90909a;
+  --text-3: #5c5c66;
+
+  --accent: #3d7bff;
+  --accent-hover: #5a8fff;
+  --accent-press: #2b62d9;
+  --accent-soft: rgba(61, 123, 255, 0.12);
+
+  /* Cheap / rich. Green = trading below the real share, red = above. */
+  --down: #1aa179;
+  --down-soft: rgba(26, 161, 121, 0.12);
+  --up: #ef4444;
+  --up-soft: rgba(239, 68, 68, 0.12);
+
+  --warn: #e8a33d;
+  --warn-soft: rgba(232, 163, 61, 0.1);
+
+  --radius: 10px;
+  --radius-sm: 7px;
 }
 
-html,
-body {
-  background: var(--surface-page);
-  color: var(--text-primary);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-.tnum {
-  font-variant-numeric: tabular-nums;
-}
-
-.card {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.hairline {
+* {
   border-color: var(--border);
 }
 
-/* Focus ring that survives both themes. */
-:where(button, a, input, select):focus-visible {
-  outline: 2px solid var(--discount);
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numbers align in columns and never jitter as they tick. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv01" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Display figures: tight tracking is what makes big numbers look designed. */
+.display {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.hairline {
+  border-top: 1px solid var(--border);
+}
+
+:where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Scrollbars that do not shout. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+
+@keyframes kolu-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.live-dot {
+  animation: kolu-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes kolu-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--raised) 25%,
+    var(--hover) 37%,
+    var(--raised) 63%
+  );
+  background-size: 200% 100%;
+  animation: kolu-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .skeleton { animation: none; }
 }

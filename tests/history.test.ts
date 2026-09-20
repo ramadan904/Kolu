@@ -135,3 +135,40 @@ describe("niceDomain", () => {
     expect(niceDomain(742)).toBe(800);
   });
 });
+
+describe("basisDomain", () => {
+  it("anchors to zero for a one-sided series instead of wasting half the chart", async () => {
+    const { basisDomain } = await import("@/lib/chart-scale");
+    const up = basisDomain([5, 60, 173]);
+    expect(up.min).toBe(0);
+    expect(up.max).toBeGreaterThanOrEqual(173);
+
+    const down = basisDomain([-5, -60, -173]);
+    expect(down.max).toBe(0);
+    expect(down.min).toBeLessThanOrEqual(-173);
+  });
+
+  it("scales each side from its own extreme rather than forcing symmetry", async () => {
+    // A drift running -25 to +180 does not need a -200 floor; that spends most
+    // of the plot on empty space.
+    const { basisDomain } = await import("@/lib/chart-scale");
+    const d = basisDomain([-25, 10, 180]);
+    expect(d.max).toBeGreaterThanOrEqual(180);
+    expect(d.min).toBeGreaterThan(-100);
+    expect(d.min).toBeLessThan(0);
+  });
+
+  it("always keeps zero on the axis", async () => {
+    const { basisDomain } = await import("@/lib/chart-scale");
+    for (const values of [[5, 9], [-5, -9], [-3, 4], [0]]) {
+      const d = basisDomain(values);
+      expect(d.min).toBeLessThanOrEqual(0);
+      expect(d.max).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("survives an empty series", async () => {
+    const { basisDomain } = await import("@/lib/chart-scale");
+    expect(basisDomain([])).toEqual({ min: -25, max: 25 });
+  });
+});

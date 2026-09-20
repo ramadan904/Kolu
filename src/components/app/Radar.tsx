@@ -1,0 +1,221 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { BoardSnapshot } from "@/lib/board";
+import type { HistorySeries } from "@/lib/history";
+import { evaluate, loadRules, saveRules, type AlertHit, type AlertRule } from "@/lib/alerts";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { AssetList } from "./AssetList";
+import { BasisChart } from "./BasisChart";
+import { Hero } from "./Hero";
+import { MarketClock } from "./MarketClock";
+import { TradePanel } from "./TradePanel";
+
+const POLL_MS = 10_000;
+
+export function Radar({ initial }: { initial: BoardSnapshot }) {
+  const [board, setBoard] = useState(initial);
+  const [tier, setTier] = useState<"core" | "all">("core");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistorySeries | null>(null);
+  const [stale, setStale] = useState(false);
+  const [fired, setFired] = useState<AlertHit[]>([]);
+  const rulesRef = useRef<AlertRule[]>([]);
+
+  useEffect(() => {
+    rulesRef.current = loadRules();
+  }, []);
+
+  const applyRules = useCallback((snapshot: BoardSnapshot) => {
+    const current = rulesRef.current;
+    if (current.length === 0) return;
+    const { hits, rules } = evaluate(current, snapshot.readings, Date.now());
+    if (hits.length === 0) return;
+    rulesRef.current = rules;
+    saveRules(rules);
+    setFired((prev) => [...hits, ...prev].slice(0, 6));
+    const prefix = snapshot.fellBack ? "[demo] " : "";
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      for (const hit of hits) {
+        try {
+          new Notification(`${prefix}Kolu — ${hit.ticker}X`, { body: hit.message });
+        } catch {
+          /* in-page list still shows it */
+        }
+      }
+    }
+  }, []);
+
+  const refresh = useCallback(
+    async (which: "core" | "all") => {
+      try {
+        const res = await fetch(`/api/basis?tier=${which}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const snapshot: BoardSnapshot = await res.json();
+        setBoard(snapshot);
+        setStale(false);
+        applyRules(snapshot);
+      } catch {
+        setStale(true);
+      }
+    },
+    [applyRules],
+  );
+
+  useEffect(() => {
+    void refresh(tier);
+    const id = setInterval(() => void refresh(tier), POLL_MS);
+    return () => clearInterval(id);
+  }, [tier, refresh]);
+
+  useEffect(() => {
+    if (!selected) {
+      setHistory(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/history?ticker=${selected}`, { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        const series = (await res.json()) as HistorySeries;
+        if (!cancelled) setHistory(series);
+      } catch {
+        if (!cancelled) setHistory(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+
+  const hedgeable = board.session.isRegularHours;
+  const tradeable = board.readings.filter(
+    (r) => r.signal === "actionable" || r.signal === "stale_reference",
+  );
+  const headline = tradeable.reduce<(typeof tradeable)[number] | null>((best, r) => {
+    if (r.basisBps === null) return best;
+    if (!best || Math.abs(r.basisBps) > Math.abs(best.basisBps ?? 0)) return r;
+    return best;
+  }, null);
+
+  const detail = selected ? board.readings.find((r) => r.ticker === selected) : null;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MarketClock session={board.session} />
+        <div className="flex items-center gap-2">
+          {board.degraded === "no_feeds" ? (
+            <Badge tone="up">Misconfigured</Badge>
+          ) : board.source === "fixture" ? (
+            // Configured demo mode is not a fallback, so `fellBack` is false
+            // here. Keying the badge off that alone once labelled demo numbers
+            // "Live" — the one thing this product must never do.
+            <Badge tone="warn">{board.fellBack ? "Demo data" : "Demo mode"}</Badge>
+          ) : stale ? (
+            <Badge tone="warn">Reconnecting</Badge>
+          ) : (
+            <Badge tone="down">Live</Badge>
+          )}
+        </div>
+      </div>
+
+      {board.degraded === "no_feeds" && (
+        <p className="mt-4 rounded-[var(--radius)] border border-[var(--up)]/25 bg-[var(--up-soft)] px-4 py-3 text-[13px] leading-relaxed">
+          The oracle answered and none of the requested symbols exist. Demo data is
+          withheld on purpose — showing it would hide this. Check{" "}
+          <code className="text-[var(--text-2)]">/api/health</code>.
+        </p>
+      )}
+
+      {board.source === "fixture" && board.degraded !== "no_feeds" && (
+        <p className="mt-4 rounded-[var(--radius)] border border-[var(--warn)]/20 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] leading-relaxed text-[var(--text-2)]">
+          {board.fellBack
+            ? "Live prices need a Pyth API key, so this is a modelled market."
+            : "Demo mode is switched on, so this is a modelled market."}{" "}
+          <span className="text-white">No number on this page is a real market price.</span>
+        </p>
+      )}
+
+      <Hero reading={headline} hedgeable={hedgeable} onTrade={setSelected} />
+
+      {fired.length > 0 && (
+        <div className="mb-5 space-y-1.5">
+          {fired.slice(0, 2).map((hit, i) => (
+            <p
+              key={`${hit.rule.id}-${i}`}
+              className="rounded-[var(--radius-sm)] bg-[var(--raised)] px-3 py-2 text-[13px] text-[var(--text-2)]"
+            >
+              <span className="num text-white">{hit.basisBps.toFixed(0)}bps</span> — {hit.message}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+          All tracked pairs
+        </h2>
+        <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] p-0.5">
+          {(["core", "all"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTier(t)}
+              aria-pressed={tier === t}
+              className={`rounded-[5px] px-2.5 py-1 text-[12px] transition-colors ${
+                tier === t
+                  ? "bg-[var(--raised)] text-white"
+                  : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+              }`}
+            >
+              {t === "core" ? "Liquid" : "All"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <AssetList
+        readings={board.readings}
+        hedgeable={hedgeable}
+        selected={selected}
+        onSelect={(t) => setSelected((cur) => (cur === t ? null : t))}
+      />
+
+      {detail && (
+        <section className="panel mt-5 p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div>
+              <h3 className="text-[18px] font-semibold tracking-[-0.02em]">
+                {detail.tokenTicker}
+                <span className="ml-2 text-[14px] font-normal text-[var(--text-3)]">
+                  {detail.name}
+                </span>
+              </h3>
+              {detail.note && (
+                <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[var(--text-2)]">
+                  {detail.note}
+                </p>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
+              Close
+            </Button>
+          </div>
+
+          {history && (
+            <div className="mt-5">
+              <BasisChart series={history} />
+            </div>
+          )}
+
+          <div className="hairline mt-6 pt-6">
+            <TradePanel reading={detail} hedgeable={hedgeable} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

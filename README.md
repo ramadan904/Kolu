@@ -173,12 +173,19 @@ src/lib/history.ts  Basis history: in-process samples + modelled demo backfill
 src/lib/alerts.ts   Alert rules, and the conditions they refuse to fire on
 src/lib/mints.ts    Token registry, loaded from config rather than compiled in
 src/lib/board.ts    Assembles the ranked snapshot
-src/components/     Board, diverging bar, basis chart, edge panel, alerts, session strip
+src/components/ui/  Button, badge — the primitives
+src/components/app/ Shell, market clock, hero, asset list, basis chart, trade panel
 ```
 
-Next.js 15 (App Router), React 19, TypeScript, Tailwind v4. No wallet
-dependency, no chain calls — the read path is entirely oracle data, which is
-why it works from a cold clone.
+Next.js 15 (App Router), React 19, TypeScript, Tailwind v4, Solana wallet
+adapter. The read path is entirely oracle data and needs no wallet or RPC,
+which is why the board works from a cold clone; the wallet is required only to
+sign a swap.
+
+Dark only, Inter, one accent. The market-direction pair (`#1aa179` cheap,
+`#ef4444` rich) is validated against the dark surface for lightness band,
+chroma, colour-vision separation and contrast — and direction is always carried
+by a sign as well as a hue.
 
 **Feed ids are resolved from Hermes by symbol at runtime and cached.** There is
 not a single hardcoded 32-byte hex id in this repository. A wrong feed id is a

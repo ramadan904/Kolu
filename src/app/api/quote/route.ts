@@ -76,6 +76,10 @@ export async function GET(request: Request) {
         // BigInt is not JSON-serialisable; amounts go out as strings.
         inAmount: quote.inAmount.toString(),
         outAmount: quote.outAmount.toString(),
+        inDecimals: side === "buy" ? quoteMint.decimals : tokenMint.decimals,
+        outDecimals: side === "buy" ? tokenMint.decimals : quoteMint.decimals,
+        // Handed straight back when building the swap, unmodified.
+        quote: quote.raw,
       },
       { headers: { "cache-control": "no-store" } },
     );
