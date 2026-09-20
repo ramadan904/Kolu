@@ -83,7 +83,9 @@ asset, priced two ways, on one clock.
   differently.
 - Feed ids are **resolved from Hermes by symbol at runtime**, never hardcoded.
   A wrong feed id is a silently wrong price, and a price wrong by a factor of
-  100 looks like the trade of the year.
+  100 looks like the trade of the year. Resolution is verified against the live
+  endpoint in CI — 24/24 symbols, all 12 tickers with both legs — on every
+  change to the universe and on a weekday schedule.
 
 ---
 

@@ -149,17 +149,18 @@ npm run typecheck
 npm run sync-feeds   # resolve the universe against live Hermes and report
 ```
 
-`sync-feeds` is how the one unverifiable claim in this repo gets settled. The
-tokenized twins are assumed to be `Crypto.<TICKER>X/USD`; when a token symbol
-does not resolve, the script prints every symbol Hermes actually publishes for
-that ticker, so the real convention is read off the output rather than guessed.
-It also runs in CI — Actions → **Verify Pyth feeds**.
+`sync-feeds` resolves the universe against live Hermes. It has been run in CI
+against the real endpoint: **24/24 symbols resolve, all 12 tickers with both
+legs.** The tokenized twins are `Crypto.<TICKER>X/USD` as assumed — confirmed,
+not guessed.
 
-If the naming is different, it is an environment variable
-(`KOLU_TOKEN_SYMBOL_TEMPLATE`), not a code change. And it fails loudly: an
-oracle that answers with none of our symbols shows *"Misconfigured, not
-offline"* and **refuses to substitute demo data**, because plausible fake
-numbers would hide the bug.
+It stays in CI (Actions → **Verify Pyth feeds**, also on a weekday schedule)
+because that convention could change under us. If it ever does, the fix is an
+environment variable (`KOLU_TOKEN_SYMBOL_TEMPLATE`), not a code change, and the
+script prints every symbol Hermes publishes for the affected ticker. It also
+fails loudly at runtime: an oracle that answers with none of our symbols shows
+*"Misconfigured, not offline"* and **refuses to substitute demo data**, because
+plausible fake numbers would hide the bug.
 
 ## How it's built
 

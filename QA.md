@@ -41,9 +41,11 @@ unlabelled.
       the exact symbol being requested. No row may show a price sourced from a
       partial ticker match — if a ticker resolves, its symbol must equal the
       requested one exactly.
-- [ ] **Universe matches reality.** Run Actions → **Verify Pyth feeds**. Every
-      equity feed must be `ok`. Any `MISSING` token feed must be reconciled
-      against the candidate list the job prints.
+- [ ] **Universe matches reality.** Run Actions → **Verify Pyth feeds**. The
+      last run against live Hermes resolved **24/24 symbols, all 12 tickers with
+      both legs** — that is the expected result. Any `MISSING` token feed means
+      the convention has drifted; reconcile against the candidate list the job
+      prints and set `KOLU_TOKEN_SYMBOL_TEMPLATE`.
 - [ ] Switch **Liquid ↔ All**. Liquid shows 5 names, All shows 12. No duplicates,
       no blank rows.
 

@@ -17,7 +17,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Secrets cannot be read in a job-level `if`, so the check is its own job and
+  # the deploy depends on its output. Without this, every push to a repo that
+  # has not been given credentials yet posts a red X on the Actions tab — which
+  # looks like a broken project to anyone browsing it, when the truth is simply
+  # that deployment has not been configured.
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ORG" ] && [ -n "$PROJECT" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy credentials present." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Deploy skipped — not configured"
+              echo ""
+              echo "Add these three repository secrets to enable deployment"
+              echo "(Settings → Secrets and variables → Actions):"
+              echo ""
+              echo "| Secret | Present |"
+              echo "| --- | --- |"
+              echo "| \`VERCEL_TOKEN\` | $([ -n "$TOKEN" ] && echo yes || echo '**no**') |"
+              echo "| \`VERCEL_ORG_ID\` | $([ -n "$ORG" ] && echo yes || echo '**no**') |"
+              echo "| \`VERCEL_PROJECT_ID\` | $([ -n "$PROJECT" ] && echo yes || echo '**no**') |"
+              echo ""
+              echo "See DEPLOY.md. This is not a build failure."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   deploy:
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
@@ -33,13 +72,6 @@ jobs:
       # Never ship a build that does not pass its own suite.
       - run: npm run typecheck
       - run: npm test
-
-      - name: Guard — deploy secrets present
-        run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "::error::VERCEL_TOKEN is not set. See DEPLOY.md for the three secrets this needs."
-            exit 1
-          fi
 
       - name: Deploy to Vercel
         id: deploy

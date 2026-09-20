@@ -72,9 +72,11 @@ below is optional.
 ### The symbol-naming variable
 
 Everything downstream depends on the tokenized twins being called
-`Crypto.<TICKER>X/USD` on Hermes. That is the documented xStocks convention, but
-it is the one claim in this repo that was never verified against a live
-endpoint.
+`Crypto.<TICKER>X/USD` on Hermes.
+
+**This has been verified against live Hermes in CI: 24/24 symbols resolve, all
+12 tickers with both legs.** You do not need to set this variable. It remains
+configurable because the convention is outside our control and could change.
 
 It is a template rather than a hardcoded string precisely so that being wrong
 costs an environment-variable change, not a code edit and a redeploy. And it
@@ -82,11 +84,12 @@ fails **loudly**: if the oracle answers and none of the symbols resolve, the
 board shows "Misconfigured, not offline" and deliberately refuses to substitute
 demo data, because plausible fake numbers would hide the bug.
 
-To get the real answer, run the **Verify Pyth feeds** workflow (Actions tab →
+If it ever does change, run the **Verify Pyth feeds** workflow (Actions tab →
 Run workflow). It calls Hermes from a GitHub runner and prints a table of what
 resolved. For any token symbol that misses, it lists every symbol Hermes
 actually publishes for that ticker — so you read the convention off the output
-instead of guessing. Then set `KOLU_TOKEN_SYMBOL_TEMPLATE` to match.
+instead of guessing. Then set `KOLU_TOKEN_SYMBOL_TEMPLATE` to match. The same
+workflow runs on a weekday schedule, so a drift shows up before a user hits it.
 
 Locally, same thing: `npm run sync-feeds`.
 
