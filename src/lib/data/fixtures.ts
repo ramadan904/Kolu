@@ -34,20 +34,31 @@ export const SCENARIOS: Scenario[] = [
   "degraded",
 ];
 
-/** Rough reference levels. Absolute values do not matter; the basis does. */
+/**
+ * Reference levels for the modelled board.
+ *
+ * Observed from live Jupiter routes on 2026-09-20 (see
+ * .github/workflows/verify-routes.yml), not invented. The basis is what the
+ * product measures, so in principle the absolute level does not matter — but
+ * a modelled board quoting SPYX at $676 when it trades near $767 is spotted
+ * instantly by anyone who follows these names, and it makes every honest
+ * number beside it look invented too.
+ *
+ * Refresh from the "Observed mid prices" block that route verification prints.
+ */
 const REFERENCE_PRICES: Record<string, number> = {
-  TSLA: 412.5,
-  NVDA: 183.2,
-  SPY: 664.8,
-  AAPL: 238.4,
-  QQQ: 592.1,
-  MSFT: 511.7,
-  META: 748.3,
-  AMZN: 231.9,
-  GOOGL: 253.6,
-  COIN: 322.4,
-  MSTR: 341.8,
-  CRCL: 148.2,
+  TSLA: 362.8,
+  NVDA: 220.5,
+  SPY: 767.2,
+  AAPL: 334.8,
+  QQQ: 721.2,
+  MSFT: 496.9,
+  META: 671.9,
+  AMZN: 252.3,
+  GOOGL: 350.3,
+  COIN: 192.5,
+  MSTR: 151.4,
+  CRCL: 90.0,
 };
 
 /** mulberry32 — small, fast, and reproducible across platforms. */

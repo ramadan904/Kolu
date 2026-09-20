@@ -231,6 +231,20 @@ an order into a different asset that happens to share a ticker. The loader
 rejects anything that is not base58, so a leftover `<AAPLx mint address>`
 placeholder is dropped rather than sent to a router.
 
+## What is verified, and where
+
+Three things about this product cannot be checked on a laptop with no network,
+so they are checked in CI, against the real services:
+
+| Workflow | Proves |
+| --- | --- |
+| **Verify Pyth feeds** | All 24 Pyth symbols resolve against live Hermes. The tokenized naming is confirmed, not assumed. |
+| **Discover mints** | All 12 xStock mints plus USDC verified against mainnet — exact symbol match, Token-2022 ownership, on-chain decimals agreement. |
+| **Verify trade routes** | All 12 pairs, both directions: live Jupiter quote, parsed by the production adapter, swap transaction built and deserialized. 24/24 legs. |
+
+The demo board's reference prices come from that last run, so modelled numbers
+sit at realistic levels rather than invented ones.
+
 ## Status
 
 The read and analysis path is complete: prices, sessions, basis, noise floor,

@@ -164,9 +164,15 @@ page is a market price, and alerts fired on demo data are prefixed `[demo]` so
 they cannot reach anyone as a live signal. Set `PYTH_API_KEY` and the same code
 path goes live with no other change.
 
-**Built and tested against recorded responses, not yet run live:** the Jupiter
-quote path. It is quote-only — Kolu never builds, signs or sends a transaction,
-and holds no key material.
+**Verified against live Jupiter:** the trade path. All twelve pairs, both
+directions — quote fetched, parsed by the production adapter, sanity-checked,
+then the real swap transaction built and deserialized as a
+`VersionedTransaction`. 24/24 legs, in CI, on every change to the routing code
+(`.github/workflows/verify-routes.yml`).
+
+That covers route, assembly, encoding and deserialization. What is **not**
+tested is the signature itself — by design, nothing but the user's own wallet
+can produce one. Kolu holds no key material and never signs.
 
 **Deliberately absent:** token mint addresses. A wrong mint does not throw, it
 routes an order into a different asset that happens to share a ticker. The repo
