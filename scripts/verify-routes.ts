@@ -29,7 +29,7 @@ import { appendFile } from "node:fs/promises";
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { JupiterSource, toBaseUnits } from "../src/lib/data/jupiter";
 import { loadMints } from "../src/lib/mints";
-import { CORE_UNIVERSE } from "../src/lib/universe";
+import { UNIVERSE } from "../src/lib/universe";
 
 interface Row {
   ticker: string;
@@ -42,9 +42,14 @@ interface Row {
   problem?: string;
 }
 
-/** Rough reference prices, only to size a sell leg and sanity-check output. */
+/**
+ * Rough reference levels, used only to size a sell leg and to bound the
+ * sanity check. Being off by tens of percent is fine; the check exists to
+ * catch being off by a factor of ten, which is what a decimals bug looks like.
+ */
 const REFERENCE: Record<string, number> = {
-  TSLA: 412, NVDA: 183, SPY: 665, AAPL: 238, QQQ: 592,
+  TSLA: 363, NVDA: 220, SPY: 767, AAPL: 335, QQQ: 721,
+  MSFT: 500, META: 700, AMZN: 230, GOOGL: 250, COIN: 320, MSTR: 340, CRCL: 150,
 };
 
 function fmt(n: number, dp = 2): string {
@@ -154,7 +159,7 @@ async function main() {
   say("| --- | --- | --- | --- | --- | --- |");
 
   const rows: Row[] = [];
-  for (const entry of CORE_UNIVERSE) {
+  for (const entry of UNIVERSE) {
     const token = mints.tokens[entry.ticker];
     if (!token) {
       rows.push({ ticker: entry.ticker, side: "buy", ok: false, problem: "no mint configured" });
@@ -167,6 +172,26 @@ async function main() {
         `| ${entry.tokenTicker} | ${side} | ${row.impactBps !== undefined ? `${fmt(row.impactBps, 1)}bps` : "—"} | ${row.impliedPrice !== undefined ? `$${fmt(row.impliedPrice)}` : "—"} | ${row.txBytes ? `${row.txBytes}B` : "—"} | ${row.ok ? "ok" : `**${row.problem}**`} |`,
       );
     }
+  }
+
+  // Print the observed levels so the demo fixtures can be kept plausible —
+  // a modelled board quoting prices from a year ago is spotted immediately.
+  const observed = new Map<string, number[]>();
+  for (const r of rows) {
+    if (r.ok && r.impliedPrice) {
+      observed.set(r.ticker, [...(observed.get(r.ticker) ?? []), r.impliedPrice]);
+    }
+  }
+  if (observed.size > 0) {
+    say("");
+    say("### Observed mid prices");
+    say("");
+    say("```");
+    for (const [ticker, prices] of observed) {
+      const mid = prices.reduce((a, b) => a + b, 0) / prices.length;
+      say(`  ${ticker}: ${mid.toFixed(1)},`);
+    }
+    say("```");
   }
 
   const ok = rows.filter((r) => r.ok).length;
