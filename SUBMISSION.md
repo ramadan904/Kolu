@@ -124,9 +124,12 @@ must *not* fire. A gap inside the noise floor doesn't. A stalled feed doesn't �
 that can manufacture any basis you like, and one false alarm at 3am gets the
 whole feature muted."
 
-**2:20 — The close.** "Four scenarios ship with it, so you can see a live
-dislocation, a calm market, or a stalled feed on demand. 95 tests. No wallet, no
-RPC, no API key — clone it and it runs." Cut to the repo.
+**2:20 — The close.** "Four scenarios ship so you can summon a live
+dislocation, a calm market or a stalled feed on demand. Pyth gated live price
+updates behind a paid plan in August, so this is a modelled market and the page
+says so in three places — but symbol resolution is live, the mints are verified
+on chain, and one environment variable flips it. 120 tests. Clone it and it
+runs." Cut to the repo.
 
 ---
 
@@ -139,6 +142,27 @@ Pyth Hermes adapter with runtime feed resolution, basis computation with the
 oracle noise floor, stale-vs-degraded classification, 48h history with
 closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. 95 tests. Falls back to labelled demo data when the live source is unreachable.
+
+**Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
+tickers, both legs — resolve against `hermes.pyth.network` in CI, on every
+change to the universe and on a weekday schedule. The tokenized twins are
+`Crypto.<TICKER>X/USD`, confirmed rather than assumed.
+
+**Live, on chain:** all twelve xStock mints plus USDC, resolved and verified
+against mainnet — exact symbol match, mint account owned by Token-2022, and
+registry decimals equal to on-chain decimals.
+
+**Gated behind a paid subscription:** live price *updates*. Pyth began requiring
+authentication on 26 August 2026, and `/v2/updates/price/latest` now returns 401
+without a key; plans start at $500/month. Feed resolution still answers
+anonymously, which is why the board resolves every pair and then shows modelled
+prices rather than live ones.
+
+That split is visible in the product rather than hidden by it. `/api/health`
+reports `apiKeyConfigured`, the board carries a banner saying no number on the
+page is a market price, and alerts fired on demo data are prefixed `[demo]` so
+they cannot reach anyone as a live signal. Set `PYTH_API_KEY` and the same code
+path goes live with no other change.
 
 **Built and tested against recorded responses, not yet run live:** the Jupiter
 quote path. It is quote-only — Kolu never builds, signs or sends a transaction,
