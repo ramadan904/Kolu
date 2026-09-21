@@ -101,34 +101,35 @@ diverging around zero — warm is a premium, cool is a discount, and AAPLX has
 gone the other way. The grey band around zero is the oracles' own confidence.
 Anything inside it we grey out, because it isn't signal."
 
-**0:45 — The proof.** Expand SPYX. Point at the chart. "This is the last 48
+**0:45 — The proof.** Click SPYX to open its trade ticket. Point at the chart. "This is the last 48
 hours. The shaded region is when the underlying market was shut. Look at the
 shape: flat through Friday's session — arbitrageurs can hedge, so they do — and
 then it opens the moment the market closes and keeps going all weekend. That's
 the whole thesis in one picture."
 
-**1:15 — The honesty.** Scroll to the edge panel. "173bps gross. Two legs of
-swap fees, measured price impact for this size from a Jupiter route quote,
-network cost. 83bps left on a $10k clip." Pause on the caveat. "And this is the
-part most tools won't tell you: the market is shut, so there's no short leg.
-This is a directional bet that it converges by the open — not an arbitrage. We
-never show that number in green."
+**1:10 — The honesty.** In the ticket: "173bps gross. Two legs of swap fees,
+measured price impact from a Jupiter route quote, network cost. 83bps left on a
+$10k clip." Point at *Net edge by size*: "and here's where it stops paying —
+live quotes at four sizes." Pause on the caveat. "The market is shut, so
+there's no short leg. This is a directional bet that it converges by the open —
+not an arbitrage. We never show that number in green."
 
-**1:45 — The failure mode.** Point at the amber banner. "This is running on demo
-data right now because the live feed was unreachable from this machine — and it
-says so. It never passes modelled numbers off as live prices."
+**1:40 — Your position.** Close the ticket. Paste an exchange hot wallet into
+*Your position*. "Real holdings, read-only, no wallet needed — valued against
+the gaps. This row: if TSLAX converges to the real share, this position loses
+this much." Point at the rings on the map. "Connect your own wallet and Buy or
+Sell opens the ticket on that side; a fill shows up here without a reload."
 
-**2:00 — Alerts.** Arm one on SPYX at 50bps. It fires on the next poll. "The
-interesting gaps happen while you're asleep, so the design question is when this
-must *not* fire. A gap inside the noise floor doesn't. A stalled feed doesn't —
-that can manufacture any basis you like, and one false alarm at 3am gets the
-whole feature muted."
+**2:05 — Alerts and the failure mode.** Arm one on SPYX at 50bps. "It must
+*not* fire on a gap inside the noise floor, or on a stalled feed — one false
+alarm at 3am gets the whole feature muted." Point at the amber banner: "demo
+data, and it says so. It never passes modelled numbers off as live."
 
 **2:20 — The close.** "Four scenarios ship so you can summon a live
 dislocation, a calm market or a stalled feed on demand. Pyth gated live price
 updates behind a paid plan in August, so this is a modelled market and the page
 says so in three places — but symbol resolution is live, the mints are verified
-on chain, and one environment variable flips it. 120 tests. Clone it and it
+on chain, and one environment variable flips it. 170 tests. Clone it and it
 runs." Cut to the repo.
 
 ---
@@ -141,7 +142,11 @@ Judges can check every line of this.
 Pyth Hermes adapter with runtime feed resolution, basis computation with the
 oracle noise floor, stale-vs-degraded classification, 48h history with
 closed-market shading, cost and edge model, threshold alerts, the full board and
-action surface. 95 tests. Falls back to labelled demo data when the live source is unreachable.
+action surface. A wallet trade flow — live Jupiter quote, wallet signature,
+polled confirmation that never reports a reverted swap as filled — and a
+positions view that values any Solana address's real xStock holdings against
+the live gaps. 170 tests. Falls back to labelled demo data when the live source
+is unreachable.
 
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
 tickers, both legs — resolve against `hermes.pyth.network` in CI, on every
@@ -184,7 +189,7 @@ so a leftover placeholder is dropped rather than handed to a router.
 ## Links
 
 - **GitHub:** https://github.com/ramadan904/Kolu
-- **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC
+- **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC for the board; set `SOLANA_RPC_URL` to trade
 
 ## Tech
 
