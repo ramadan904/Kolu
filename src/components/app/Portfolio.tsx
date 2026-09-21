@@ -7,6 +7,7 @@ import { EXAMPLE_WALLET, knownLabel } from "@/lib/known-wallets";
 import type { MintMap, Side } from "./TradePanel";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { useActivity, type ActivityState } from "./useActivity";
+import { OpenOrders, useOpenOrders } from "./OpenOrders";
 import { ago } from "@/lib/activity";
 import { fmtPct, fmtUsd } from "@/lib/format";
 import { fmtAmount } from "@/lib/tokens";
@@ -101,6 +102,12 @@ export function Portfolio({
     [holdings, mints],
   );
   const activity = useActivity(demo ? null : owner, mints, heldMints);
+  const openOrders = useOpenOrders(demo ? null : owner, mints);
+  const tokenPrices = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const r of readings) if (r.token) out[r.tokenTicker] = r.token.price;
+    return out;
+  }, [readings]);
 
   // Every hook above runs on every render; early returns only below this line.
   if (demo) {
@@ -293,6 +300,9 @@ export function Portfolio({
             </button>
           )}
         </div>
+        {owner && (
+          <OpenOrders owner={owner} orders={openOrders.orders} error={openOrders.error} prices={tokenPrices} />
+        )}
         {activity.items.length > 0 && <ActivityList state={activity} />}
       </div>
     );
@@ -443,6 +453,9 @@ export function Portfolio({
             </button>
           )}
         </p>
+      )}
+      {owner && (
+        <OpenOrders owner={owner} orders={openOrders.orders} error={openOrders.error} prices={tokenPrices} />
       )}
       <ActivityList state={activity} />
       <p className="border-t border-[var(--border)] py-2 text-[11px] text-[var(--text-3)]">

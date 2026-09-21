@@ -122,6 +122,10 @@ what each would gain or lose if its gap closed, and its latest xStock activity
 read from chain." Point at the rings on the map. "Connect your own wallet and
 Buy or Sell opens the ticket on that side; a fill lands here without a reload."
 
+**1:55 — Act on a gap while you sleep.** In any ticket, *Limit at a gap*:
+"Buy TSLAX if it trades 0.5% under the real share — that's a real Jupiter limit
+order, filled on-chain with Kolu closed." *Dry run* simulates the exact order.
+
 **2:05 — Alerts.** On a quiet board: *Alert me when a gap pays* — every pair
 armed at the break-even gap for a $10k trade. "It never fires on noise or on a
 stalled feed; one false alarm at 3am gets the feature muted."

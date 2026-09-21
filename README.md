@@ -120,6 +120,14 @@ quantity, value, gap, and what each holding gains or loses if the token
 converges to the real share. Holdings outside the table's filter are listed,
 never silently dropped from the total.
 
+**Limit orders at a gap.** "Buy TSLAX if it trades 0.5% under the real share":
+Kolu turns the gap target into a real Jupiter limit order, held and filled
+on-chain while nobody is watching — Kolu can be closed. The limit is fixed from
+the real share's price at placement, and the ticket says so: if the share
+moves, the order does not follow. Open orders are listed under *Your position*
+with Cancel. Without a wallet, *Dry run* builds and simulates the exact order
+transaction on mainnet.
+
 **Balance-aware trading.** The ticket reads what you hold; *Max* fills the size.
 A trade larger than your holdings is blocked before it reaches the wallet.
 Quotes older than 10s are refreshed before signing. Confirmation is polled, and

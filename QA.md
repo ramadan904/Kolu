@@ -213,6 +213,21 @@ unlabelled.
       link and **no retry button** — it must never say "nothing was filled"
       unless the blockhash has expired and the signature is absent.
 
+### Limit orders
+
+- [ ] In a ticket, *Limit at a gap*: the summary states the limit price, the gap
+      it implies against the real share *now*, and that the limit will not
+      follow the share. −0.50% on a $375 share reads ~$373.13.
+- [ ] Without a wallet, *Dry run* simulates the exact order transaction and
+      says whose wallet it simulated. Under $5 is refused (Jupiter's minimum).
+      A limit already on the wrong side of the market is refused ("would fill
+      at once — use Now").
+- [ ] Rejecting in the wallet: "You cancelled in your wallet. Nothing was sent."
+      If Jupiter does not confirm within 30s: "Sent — not confirmed yet — check
+      Open limit orders before placing it again". Never "placed" unless it was.
+- [ ] A placed order appears under Your position → Open limit orders, with how
+      far it is from filling; Cancel is offered only to the connected maker.
+
 ### Real history
 
 - [ ] Open a ticket: the chart legend reads *real · pool trades vs exchange

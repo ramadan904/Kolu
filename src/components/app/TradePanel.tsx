@@ -22,6 +22,7 @@ import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 import { pollConfirmation } from "@/lib/confirm";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
+import { LimitOrder } from "./LimitOrder";
 
 export type Side = "buy" | "sell";
 type Unit = "usd" | "token";
@@ -152,6 +153,8 @@ export function TradePanel({
   const [tick, setTick] = useState(0);
   const [tx, setTx] = useState<TxState>({ kind: "idle" });
   const [dry, setDry] = useState<DryRun>({ kind: "idle" });
+  // Now = a swap at today's price. Limit = an on-chain order that waits for a gap.
+  const [mode, setMode] = useState<"now" | "limit">("now");
 
   // Taking the wrong side of a gap only means something when the gap does.
   const against = gapIsSignal && hasGap && side !== gapSide;
@@ -567,11 +570,43 @@ export function TradePanel({
           body={
             demo
               ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim()
-              : typical
-                ? `${verdict.body} Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut.`.trim()
-                : verdict.body
+              : [
+                  verdict.body,
+                  typical
+                    ? `Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut.`
+                    : "",
+                  // Nothing pays now: point at the tool that waits for it.
+                  mode === "now" && (verdict.tone === "bad" || verdict.tone === "neutral")
+                    ? "Or set a limit at a gap and let it fill when one opens."
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
           }
         />
+
+        {!demo && (
+          <div className="flex rounded-[var(--radius-sm)] bg-[var(--raised)] p-0.5 text-[12px]" role="tablist">
+            {([
+              ["now", "Trade now"],
+              ["limit", "Limit at a gap"],
+            ] as const).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                disabled={busy}
+                className={`flex-1 rounded-[5px] py-1.5 font-medium transition-colors ${
+                  mode === m ? "bg-[var(--hover)] text-white" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Side. The one that captures the gap is marked only when the board
             calls the gap a signal; the other side stays available for exits. */}
@@ -679,6 +714,8 @@ export function TradePanel({
             </div>
           </div>
 
+          {mode === "now" && (
+          <>
           <div className="mt-4 flex items-baseline justify-between">
             <span className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
               Net edge by size
@@ -726,8 +763,12 @@ export function TradePanel({
               );
             })}
           </div>
+          </>
+          )}
         </section>
 
+        {mode === "now" && (
+        <>
         <section className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
             Max slippage
@@ -825,11 +866,27 @@ export function TradePanel({
             smaller — the gap is not wide enough to absorb {(slippageBps / 100).toFixed(1)}%.
           </p>
         )}
+        </>
+        )}
         {balanceError && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">{balanceError}</p>
         )}
       </div>
 
+      {mode === "limit" && !demo ? (
+        <LimitOrder
+          reading={reading}
+          side={side}
+          sizeUsd={notional}
+          sizeValid={sizeValid}
+          mints={mints}
+          shortfall={shortfall}
+          payUnit={payUnit}
+        >
+          {children}
+        </LimitOrder>
+      ) : (
+        <>
       {children && <div className="mt-8">{children}</div>}
 
       {/* The decision, pinned. Whatever is scrolled into view above — the
@@ -992,6 +1049,8 @@ export function TradePanel({
           </>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
