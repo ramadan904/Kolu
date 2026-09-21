@@ -25,7 +25,7 @@ const POLL_MS = 30_000;
 /** Back-off before each retry of a rate-limited read. */
 const RETRY_DELAYS_MS = [800, 2_000];
 
-const REFRESH_EVENT = "kolu:balances-refresh";
+export const REFRESH_EVENT = "kolu:balances-refresh";
 const WATCH_STORAGE_KEY = "kolu:watch-address";
 
 /**

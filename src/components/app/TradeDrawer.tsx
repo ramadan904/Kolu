@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BasisReading } from "@/lib/basis/compute";
 import type { HistorySeries } from "@/lib/history";
 import type { AlertDirection, AlertRule } from "@/lib/alerts";
@@ -48,6 +48,19 @@ export function TradeDrawer({
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  // The address bar already mirrors this ticket (see Radar), so sharing it is
+  // copying the current URL.
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked: the address bar still has the link */
+    }
+  };
 
   // Escape closes, focus moves in, and the page behind does not scroll away
   // underneath the panel.
@@ -88,7 +101,7 @@ export function TradeDrawer({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative flex h-full w-full max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] outline-none"
+        className="relative flex h-full w-full min-w-0 max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] outline-none"
       >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4 sm:px-6">
           <div className="min-w-0">
@@ -101,11 +114,20 @@ export function TradeDrawer({
             <p className="mt-0.5 truncate text-[13px] text-[var(--text-3)]">{reading.name}</p>
           </div>
 
+          <div className="-mr-1 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="rounded-[var(--radius-sm)] px-2 py-1 text-[12px] text-[var(--text-3)] transition-colors hover:bg-[var(--raised)] hover:text-white"
+            aria-live="polite"
+          >
+            {copied ? "Copied" : "Copy link"}
+          </button>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 rounded-[var(--radius-sm)] p-1.5 text-[var(--text-3)] transition-colors hover:bg-[var(--raised)] hover:text-white"
+            className="rounded-[var(--radius-sm)] p-1.5 text-[var(--text-3)] transition-colors hover:bg-[var(--raised)] hover:text-white"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path
@@ -116,6 +138,7 @@ export function TradeDrawer({
               />
             </svg>
           </button>
+          </div>
         </header>
 
         {/* The three numbers the decision rests on, restated so nobody trades

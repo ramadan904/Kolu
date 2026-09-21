@@ -676,7 +676,7 @@ export function TradePanel({
             </span>
             <span className="text-[11px] text-[var(--text-3)]">live Jupiter quotes</span>
           </div>
-          <div className="mt-2 grid grid-cols-4 gap-1.5">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {SIZES.map((size) => {
               const active = Math.abs(notional - size) < 0.5;
               // Jupiter routes each request independently, so two quotes for
@@ -753,7 +753,7 @@ export function TradePanel({
               </svg>
               How the net edge is worked out
             </span>
-            <span className="num text-[var(--text-3)]">
+            <span className="num hidden text-[var(--text-3)] sm:inline">
               {edge
                 ? `${fmtBps(edge.grossBps, 0)} gap − ${Math.round(edge.costBps)}bps costs`
                 : "—"}
@@ -890,7 +890,7 @@ export function TradePanel({
               <div className="num min-w-0 text-[13px] leading-snug text-[var(--text-2)]">
                 {sizeValid ? (
                   <>
-                    <div className="truncate">
+                    <div className="sm:truncate">
                       Pay <span className="text-white">{fmtAmount(needed)} {payUnit}</span>
                       {" → "}receive{" "}
                       {received !== null ? (
@@ -899,7 +899,7 @@ export function TradePanel({
                         <span className="skeleton inline-block h-3 w-16 align-middle" />
                       )}
                     </div>
-                    <div className="truncate text-[12px] text-[var(--text-3)]">
+                    <div className="text-[12px] text-[var(--text-3)] sm:truncate">
                       {minReceived !== null
                         ? `At worst ${fmtAmount(minReceived)} ${receiveUnit} at your ${(slippageBps / 100).toFixed(1)}% limit`
                         : " "}
@@ -1149,7 +1149,7 @@ function Steps({ steps }: { steps: { label: string; state: StepState; hint?: str
     failed: "var(--up)",
   };
   return (
-    <ol className="mb-3 flex items-center gap-1.5 text-[11px]" aria-label="Trade steps">
+    <ol className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]" aria-label="Trade steps">
       {steps.map((step, i) => (
         <li key={step.label} className="flex min-w-0 items-center gap-1.5" title={step.hint}>
           {i > 0 && <span className="h-px w-3 shrink-0 bg-[var(--border-strong)]" aria-hidden="true" />}

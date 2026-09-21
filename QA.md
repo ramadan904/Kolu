@@ -213,6 +213,22 @@ unlabelled.
       link and **no retry button** — it must never say "nothing was filled"
       unless the blockhash has expired and the signature is absent.
 
+### Links, activity, first visit, mobile
+
+- [ ] `?trade=TSLA&side=sell` opens the TSLAX ticket on Sell; `?trade=COIN`
+      switches the table to All and opens COINX; `?replay=1` starts the replay
+      (and must render — a hook-order crash here once took the page down);
+      `?view=example` loads the example wallet. Closing the ticket clears the URL.
+      A watched address is never written into the URL.
+- [ ] Copy link in the ticket header copies the current URL.
+- [ ] Recent xStock activity on the example wallet lists real movements with
+      Solscan links (on the public RPC this takes a few seconds — it reads one
+      transaction at a time). After a fill, the trade appears without a reload.
+- [ ] First visit shows "Things to try"; each step performs its action; "Got
+      it" hides it for good.
+- [ ] At 390px: no horizontal scroll; holdings are cards; the ticket drawer
+      fits the screen with the pinned bar visible; pay/receive wraps.
+
 ### Board consistency
 
 - [ ] During regular hours with stalled references, the hero reads "No clean

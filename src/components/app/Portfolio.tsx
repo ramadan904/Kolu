@@ -5,7 +5,9 @@ import type { BasisReading } from "@/lib/basis/compute";
 import { computeEdge, sideForGap } from "@/lib/basis/edge";
 import { EXAMPLE_WALLET, knownLabel } from "@/lib/known-wallets";
 import type { MintMap, Side } from "./TradePanel";
-import { useBalances } from "./useBalances";
+import { requestBalancesRefresh, useBalances } from "./useBalances";
+import { useActivity, type ActivityState } from "./useActivity";
+import { ago } from "@/lib/activity";
 import { fmtPct, fmtUsd } from "@/lib/format";
 import { fmtAmount } from "@/lib/tokens";
 import { convergenceUsd } from "@/lib/trade";
@@ -87,6 +89,20 @@ export function Portfolio({
       .map(([ticker]) => `${ticker}X`);
   }, [readings, balances, mints]);
 
+  // Largest holdings first: their token accounts are where a busy wallet's
+  // xStock activity is found.
+  const heldMints = useMemo(
+    () =>
+      mints
+        ? holdings
+            .map((h) => mints.tokens[h.reading.ticker]?.mint)
+            .filter((m): m is string => Boolean(m))
+        : [],
+    [holdings, mints],
+  );
+  const activity = useActivity(demo ? null : owner, mints, heldMints);
+
+  // Every hook above runs on every render; early returns only below this line.
   if (demo) {
     return (
       <div className="panel mb-5 px-4 py-3.5">
@@ -200,11 +216,11 @@ export function Portfolio({
         )}
       </div>
 
-      <div className="flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] whitespace-nowrap text-[var(--text-3)]">
         <Freshness updatedAt={updatedAt} refreshing={refreshing} failed={error !== null} />
         <button
           type="button"
-          onClick={refresh}
+          onClick={requestBalancesRefresh}
           disabled={refreshing}
           className="transition-colors hover:text-white disabled:opacity-50"
         >
@@ -277,6 +293,7 @@ export function Portfolio({
             </button>
           )}
         </div>
+        {activity.items.length > 0 && <ActivityList state={activity} />}
       </div>
     );
   }
@@ -285,7 +302,62 @@ export function Portfolio({
     <div className="panel mb-5 px-4 pt-3.5 pb-2 sm:px-5">
       {header}
 
-      <table className="mt-3.5 w-full text-[13px]">
+      {/* Phones: one card per holding — five numeric columns cannot share 390px. */}
+      <ul className="mt-3.5 sm:hidden">
+        {holdings.map(({ reading: r, amount, value, convergence }) => {
+          const muted = !isSignal(r);
+          const hint = actionHint(r, value, isSignal(r));
+          const lead = hint.tone === "act" && r.basisBps ? sideForGap(r.basisBps) : null;
+          return (
+            <li key={r.ticker} className="border-t border-[var(--border)] py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span>
+                  <span className="font-medium">{r.tokenTicker}</span>
+                  <span className="ml-2 text-[12px] text-[var(--text-3)]">{r.name}</span>
+                </span>
+                <span className="num text-[14px]">{fmtUsd(value)}</span>
+              </div>
+              <div className="num mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-[var(--text-3)]">
+                <span>{fmtAmount(amount)}</span>
+                <span
+                  style={{
+                    color:
+                      r.basisBps === null || muted
+                        ? "var(--text-2)"
+                        : r.basisBps < 0
+                          ? "var(--down)"
+                          : "var(--up)",
+                  }}
+                >
+                  gap {r.basisBps === null ? "—" : fmtPct(r.basisBps)}
+                </span>
+                <span style={{ color: muted ? "var(--text-3)" : pnlColor(convergence ?? 0) }}>
+                  if it closes {convergence === null ? "—" : signedUsd(convergence)}
+                  {muted && convergence !== null ? " (noise)" : ""}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span
+                  className="min-w-0 text-[11px]"
+                  style={{ color: hint.tone === "act" ? "var(--down)" : "var(--text-3)" }}
+                >
+                  {hint.text}
+                </span>
+                <span className="inline-flex shrink-0 gap-1.5">
+                  <RowAction lead={lead === "buy"} onClick={() => onTrade(r.ticker, "buy")}>
+                    Buy
+                  </RowAction>
+                  <RowAction lead={lead === "sell"} onClick={() => onTrade(r.ticker, "sell")}>
+                    Sell
+                  </RowAction>
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <table className="mt-3.5 hidden w-full text-[13px] sm:table">
         <thead>
           <tr className="border-t border-[var(--border)] text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
             <th className="py-2 text-left font-normal">Holding</th>
@@ -372,6 +444,7 @@ export function Portfolio({
           )}
         </p>
       )}
+      <ActivityList state={activity} />
       <p className="border-t border-[var(--border)] py-2 text-[11px] text-[var(--text-3)]">
         {watching
           ? "Watching a public address · read-only, nothing can be signed for it. Connect your own wallet to trade."
@@ -461,6 +534,67 @@ function actionHint(
       ? `Rich · selling captures ≈ ${signedUsd(edge.netUsd)} (est.)`
       : `Cheap · adding $10k captures ≈ ${signedUsd(edge.netUsd)} (est.)`,
   };
+}
+
+/**
+ * The wallet's recent xStock movements, in the words a trader would use. A
+ * fill made here shows up without a reload; so does anything done elsewhere.
+ */
+function ActivityList({ state }: { state: ActivityState }) {
+  const now = Math.floor(Date.now() / 1000);
+  return (
+    <div className="border-t border-[var(--border)] py-3">
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <span className={LABEL}>Recent xStock activity</span>
+        {state.loading && <span className="text-[11px] text-[var(--text-3)]">Reading history…</span>}
+      </div>
+      {state.error ? (
+        <p className="text-[12px] text-[var(--text-3)]">{state.error}</p>
+      ) : state.items.length === 0 ? (
+        !state.loading && (
+          <p className="text-[12px] text-[var(--text-3)]">
+            No xStock movements in the latest transactions.
+          </p>
+        )
+      ) : (
+        <ul className="space-y-1">
+          {state.items.map((a) => (
+            <li key={a.signature} className="flex flex-wrap items-baseline justify-between gap-x-4 text-[13px]">
+              <span className="num">
+                <span
+                  style={{
+                    color: a.failed
+                      ? "var(--text-3)"
+                      : a.kind === "bought" || a.kind === "received"
+                        ? "var(--down)"
+                        : "var(--up)",
+                  }}
+                >
+                  {a.kind === "bought" ? "Bought" : a.kind === "sold" ? "Sold" : a.kind === "received" ? "Received" : "Sent"}
+                </span>{" "}
+                {fmtAmount(a.tokenAmount)} {a.tokenTicker}
+                {a.usdcAmount !== null && (
+                  <span className="text-[var(--text-2)]">
+                    {" "}
+                    for {fmtAmount(a.usdcAmount)} USDC
+                  </span>
+                )}
+                {a.failed && <span className="text-[var(--text-3)]"> · failed</span>}
+              </span>
+              <a
+                href={`https://solscan.io/tx/${a.signature}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-[12px] text-[var(--text-3)] transition-colors hover:text-white"
+              >
+                {ago(a.time, now)} ↗
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** The deepest live discount — the gap a USDC holder can act on. */

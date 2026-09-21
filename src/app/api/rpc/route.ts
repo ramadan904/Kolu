@@ -35,6 +35,8 @@ const ALLOWED = new Set([
   "sendTransaction",
   "getSignatureStatuses",
   "getTransaction",
+  // recent activity
+  "getSignaturesForAddress",
   "getFeeForMessage",
   "getHealth",
   "getGenesisHash",

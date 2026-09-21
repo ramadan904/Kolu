@@ -22,11 +22,14 @@ import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
 import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
+import { FirstVisit } from "./FirstVisit";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
 import { breakevenBps } from "@/lib/basis/edge";
 import type { Scenario } from "@/lib/data/fixtures";
+import { findEntry } from "@/lib/universe";
+import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 
 const POLL_MS = 10_000;
 
@@ -178,7 +181,41 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     };
   }, [selected]);
 
-  const { balances, watching } = useBalances();
+  const { balances, watching, owner, watch } = useBalances();
+
+  // Deep links: ?trade=TSLA[&side=sell], ?replay=1, ?view=example. Read once,
+  // so a shared link opens exactly the view it was copied from.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("replay") === "1") setDemo("live_dislocation");
+    if (params.get("view") === "example") watch(EXAMPLE_WALLET.address);
+    const ticker = params.get("trade");
+    const entry = ticker ? findEntry(ticker) : undefined;
+    if (entry) {
+      if (entry.tier !== "core") setTier("all");
+      const side = params.get("side");
+      setTradeSide(side === "buy" || side === "sell" ? side : undefined);
+      setSelected(entry.ticker);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ...and kept in the address bar, so copying it always shares the current
+  // view. A watched address is never put in a URL — only the public example.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selected) {
+      params.set("trade", selected);
+      if (tradeSide) params.set("side", tradeSide);
+    }
+    if (demo) params.set("replay", "1");
+    if (watching && owner === EXAMPLE_WALLET.address) params.set("view", "example");
+    const query = params.toString();
+    const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", next);
+    }
+  }, [selected, tradeSide, demo, watching, owner]);
   const held = useMemo(() => {
     const out = new Set<string>();
     if (!mints) return out;
@@ -280,6 +317,22 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           )}
         </div>
       )}
+
+      <FirstVisit
+        onReplay={() => {
+          setSelected(null);
+          setDemo("live_dislocation");
+        }}
+        onExample={() => {
+          setDemo(null);
+          watch(EXAMPLE_WALLET.address);
+        }}
+        onTicket={() => {
+          setDemo(null);
+          const target = headline?.ticker ?? board.readings[0]?.ticker;
+          if (target) openTrade(target);
+        }}
+      />
 
       <div className="mt-4" />
       <Portfolio
