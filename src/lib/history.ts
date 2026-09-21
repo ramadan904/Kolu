@@ -30,6 +30,12 @@ export interface HistorySeries {
   synthetic: boolean;
   /** Minutes actually covered by observed data. */
   observedMinutes: number;
+  /**
+   * Where the points came from. "market" = real history built from the
+   * token's pool trades and the share's exchange prints; absent = the modelled
+   * shape plus this process's own observations.
+   */
+  source?: "market";
 }
 
 /** 48h at one sample per two minutes. */
@@ -128,8 +134,13 @@ export function backfill(
       // Thin quoting: weak pull, wider noise.
       value = value * 0.97 + (rng() - 0.5) * 9;
     } else {
-      // Nothing to arbitrage against: drift accumulates.
-      value = value + drift * rng() * 3.2 + (rng() - 0.5) * 7;
+      // Nothing to arbitrage against: drift accumulates. Damped toward real
+      // history (token pool trades vs the share's last print), where closed-
+      // market gaps average ~2x the open-session ones, around 40-50bps. The old
+      // drift drew 300+bps overnight and oversold the thing this product
+      // measures. This is only the dashed fallback when real history is
+      // unavailable; the shape is kept strong enough to stay legible.
+      value = value + drift * rng() * 1.2 + (rng() - 0.5) * 4;
     }
 
     points.push({ t, basisBps: value, phase });

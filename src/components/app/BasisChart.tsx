@@ -30,6 +30,9 @@ export function BasisChart({
   observed?: { t: number; basisBps: number }[];
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Real history is drawn as the record it is; only the modelled fallback is
+  // dashed and dimmed, so the two can never be confused.
+  const real = series.source === "market";
   const [hover, setHover] = useState<number | null>(null);
 
   const model = useMemo(() => {
@@ -124,10 +127,10 @@ export function BasisChart({
             <svg width="14" height="6" aria-hidden="true">
               <line
                 x1="0" y1="3" x2="14" y2="3"
-                stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2"
+                stroke="currentColor" strokeWidth="1.5" strokeDasharray={real ? undefined : "3 2"}
               />
             </svg>
-            modelled
+            {real ? "real · pool trades vs exchange prints" : "modelled"}
           </span>
           {seenCount >= 2 && (
             <span className="flex items-center gap-1.5 normal-case tracking-normal">
@@ -147,9 +150,11 @@ export function BasisChart({
                 minute: "2-digit",
                 hour12: false,
               })} ET · ${fmtBps(active.basisBps, 1)} · ${SESSION_COPY[active.phase]}`
-            : seenCount >= 2
-              ? `${seenCount} readings observed in this browser`
-              : "Modelled shape — real readings appear as you watch"}
+            : real
+              ? "Token's on-chain trades vs the real share's last print, every 15 min"
+              : seenCount >= 2
+                ? `${seenCount} readings observed in this browser`
+                : "Modelled shape — real readings appear as you watch"}
         </span>
       </div>
 
@@ -197,15 +202,15 @@ export function BasisChart({
           </g>
         ))}
 
-        {/* Modelled context: dashed and dimmed, so it cannot be mistaken for
-            a reading anyone took. */}
+        {/* Modelled context is dashed and dimmed, so it cannot be mistaken for
+            a reading anyone took; real history is drawn solid. */}
         <path
           d={line}
           fill="none"
           stroke={stroke}
-          strokeOpacity={0.4}
-          strokeDasharray="4 3"
-          strokeWidth={1.5}
+          strokeOpacity={real ? 1 : 0.4}
+          strokeDasharray={real ? undefined : "4 3"}
+          strokeWidth={real ? 1.75 : 1.5}
           strokeLinejoin="round"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"

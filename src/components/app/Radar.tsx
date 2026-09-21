@@ -166,7 +166,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/history?ticker=${selected}`, { cache: "no-store" });
+        const res = await fetch(
+          `/api/history?ticker=${selected}${demo ? "&modelled=1" : ""}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) throw new Error();
         const series = (await res.json()) as HistorySeries;
         if (!cancelled) {
@@ -180,7 +183,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, demo]);
 
   const { balances, watching, owner, watch } = useBalances();
 

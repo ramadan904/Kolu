@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { buildBoard } from "@/lib/board";
 import { seriesFor } from "@/lib/history";
 import { findEntry } from "@/lib/universe";
+import { loadMints } from "@/lib/mints";
+import { realHistory } from "@/lib/data/market-history";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,15 +16,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Unknown ticker: ${ticker}` }, { status: 404 });
   }
 
+  // Real history first: the token's own trades against the share's real
+  // prints. Skipped for a replay (`modelled=1`), whose gap is modelled too.
+  const modelledOnly = new URL(request.url).searchParams.get("modelled") === "1";
+  if (!modelledOnly) {
+    try {
+      const mint = (await loadMints()).tokens[entry.ticker]?.mint;
+      const points = mint ? await realHistory(entry.ticker, mint) : null;
+      if (points) {
+        return NextResponse.json(
+          {
+            ticker: entry.ticker,
+            points,
+            synthetic: false,
+            observedMinutes: Math.round((points[points.length - 1].t - points[0].t) / 60_000),
+            source: "market",
+          },
+          { headers: { "cache-control": "public, max-age=60, s-maxage=300" } },
+        );
+      }
+    } catch {
+      /* fall through to the modelled shape */
+    }
+  }
+
   try {
     // Rebuilding the board also anchors the series to the price on screen, so
     // the right edge of the chart always matches the row that opened it.
     const board = await buildBoard({ tier: "all" });
     const reading = board.readings.find((r) => r.ticker === entry.ticker);
-    // Always modelled, whatever the price source. Real history cannot live in
-    // a serverless process — each request may land on a fresh instance — so
-    // this is context for the shape, and the client supplies what it has
-    // genuinely observed. The chart draws the two differently.
+    // Modelled fallback: real history was unavailable (or a replay asked for
+    // the model). The client overlays what it has genuinely observed, and the
+    // chart draws the two differently.
     const series = seriesFor(
       entry.ticker,
       reading?.basisBps ?? null,
