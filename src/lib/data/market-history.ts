@@ -140,3 +140,36 @@ function staleOrNull(ticker: string): HistoryPoint[] | null {
   const hit = seriesCache.get(ticker);
   return hit && Date.now() - hit.at < STALE_OK_MS ? hit.points : null;
 }
+
+export interface GapContext {
+  /** Share of the last 48h where |gap| was at or below today's |gap|, 0-100. */
+  percentile: number;
+  /** Median |gap| while the share could trade, and while it could not. */
+  typicalOpenBps: number | null;
+  typicalShutBps: number | null;
+}
+
+const median = (xs: number[]) => {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/**
+ * How unusual today's gap is against this pair's own real history. Answers
+ * the question that follows "what is the gap": is that normal for this name?
+ * Only meaningful on real history — never computed from the modelled shape.
+ */
+export function gapContext(points: HistoryPoint[], currentBps: number): GapContext | null {
+  if (points.length < 24) return null;
+  const now = Math.abs(currentBps);
+  const abs = points.map((p) => Math.abs(p.basisBps));
+  const within = abs.filter((a) => a <= now).length;
+  const shut = new Set(["closed", "weekend", "holiday"]);
+  return {
+    percentile: Math.round((within / abs.length) * 100),
+    typicalOpenBps: median(points.filter((p) => p.phase === "regular").map((p) => Math.abs(p.basisBps))),
+    typicalShutBps: median(points.filter((p) => shut.has(p.phase)).map((p) => Math.abs(p.basisBps))),
+  };
+}

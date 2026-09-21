@@ -31,3 +31,22 @@ describe("alignBasis", () => {
     expect(Math.round(out[0].basisBps)).toBe(-100);
   });
 });
+
+describe("gapContext", () => {
+  const mk = (bps: number[], phase: "regular" | "closed") =>
+    bps.map((b, i) => ({ t: i, basisBps: b, phase }) as const);
+
+  it("ranks today's gap against the pair's own history and splits typical by session", async () => {
+    const { gapContext } = await import("@/lib/data/market-history");
+    const points = [...mk(Array.from({ length: 20 }, (_, i) => i - 10), "regular"), ...mk(Array.from({ length: 20 }, (_, i) => 30 + i), "closed")];
+    const c = gapContext(points, 45)!;
+    expect(c.percentile).toBe(90); // 36 of 40 points at or below |45|
+    expect(c.typicalOpenBps).toBe(5);
+    expect(c.typicalShutBps).toBe(39.5);
+  });
+
+  it("refuses to rank against too little history", async () => {
+    const { gapContext } = await import("@/lib/data/market-history");
+    expect(gapContext(mk([1, 2, 3], "regular"), 2)).toBeNull();
+  });
+});

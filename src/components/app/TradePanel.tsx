@@ -112,6 +112,7 @@ export function TradePanel({
   mints,
   initialSide,
   demo = false,
+  typical,
   children,
 }: {
   reading: BasisReading;
@@ -121,6 +122,8 @@ export function TradePanel({
   initialSide?: Side;
   /** A replayed, modelled scenario: the ticket explains, but nothing can be sent or simulated. */
   demo?: boolean;
+  /** This pair's median |gap| over 48h of real history, open vs shut. */
+  typical?: { openBps: number; shutBps: number };
   /**
    * Context rendered below the controls (chart, alerts). Passed in rather than
    * placed after the panel so the action bar stays pinned while it scrolls.
@@ -561,7 +564,13 @@ export function TradePanel({
       <div className="space-y-6">
         <Verdict
           {...verdict}
-          body={demo ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim() : verdict.body}
+          body={
+            demo
+              ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim()
+              : typical
+                ? `${verdict.body} Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut.`.trim()
+                : verdict.body
+          }
         />
 
         {/* Side. The one that captures the gap is marked only when the board

@@ -373,12 +373,24 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       {fired.length > 0 && (
         <div className="mb-5 space-y-1.5">
           {fired.slice(0, 2).map((hit, i) => (
-            <p
+            <div
               key={`${hit.rule.id}-${i}`}
-              className="rounded-[var(--radius-sm)] bg-[var(--raised)] px-3 py-2 text-[13px] text-[var(--text-2)]"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--raised)] px-3 py-2 text-[13px] text-[var(--text-2)]"
             >
-              <span className="num text-white">{hit.basisBps.toFixed(0)}bps</span> — {hit.message}
-            </p>
+              <p>
+                <span className="num text-white">{hit.basisBps.toFixed(0)}bps</span> — {hit.message}
+              </p>
+              {/* An alert is only useful if it leads somewhere: straight to the ticket. */}
+              {!demo && (
+                <button
+                  type="button"
+                  onClick={() => openTrade(hit.rule.ticker)}
+                  className="shrink-0 text-[12px] text-[var(--accent)] underline-offset-2 hover:underline"
+                >
+                  Open ticket →
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { AlertControl } from "./Alerts";
 import { BasisChart } from "./BasisChart";
 import { TradePanel, type MintMap, type Side } from "./TradePanel";
+import { gapContext } from "@/lib/data/market-history";
 
 /**
  * A focused surface for committing capital.
@@ -75,6 +76,13 @@ export function TradeDrawer({
       document.body.style.overflow = previous;
     };
   }, [onClose]);
+
+  // How unusual this gap is for this pair — only from real history, never
+  // from the modelled fallback.
+  const context =
+    history?.source === "market" && reading.basisBps !== null
+      ? gapContext(history.points, reading.basisBps)
+      : null;
 
   const discount = (reading.basisBps ?? 0) < 0;
   const gapUsd = Math.abs(reading.basisUsd ?? 0);
@@ -150,6 +158,13 @@ export function TradeDrawer({
             label="Gap"
             value={reading.basisBps === null ? "—" : fmtPct(reading.basisBps)}
             sub={reading.basisBps === null ? undefined : `${fmtUsd(gapUsd)} per share`}
+            sub2={
+              context
+                ? context.percentile >= 50
+                  ? `wider than ${context.percentile}% of 48h`
+                  : `tighter than ${100 - context.percentile}% of 48h`
+                : undefined
+            }
             tone={signal ? (discount ? "down" : "up") : undefined}
           />
         </div>
@@ -167,6 +182,11 @@ export function TradeDrawer({
             mints={mints}
             initialSide={initialSide}
             demo={demo}
+            typical={
+              context && context.typicalOpenBps !== null && context.typicalShutBps !== null
+                ? { openBps: context.typicalOpenBps, shutBps: context.typicalShutBps }
+                : undefined
+            }
           >
             {history && (
               <div className="border-t border-[var(--border)] pt-6">
@@ -197,11 +217,13 @@ function Stat({
   label,
   value,
   sub,
+  sub2,
   tone,
 }: {
   label: string;
   value: string;
   sub?: string;
+  sub2?: string;
   tone?: "down" | "up";
 }) {
   return (
@@ -214,6 +236,7 @@ function Stat({
         {value}
       </div>
       {sub && <div className="num mt-0.5 text-[11px] text-[var(--text-3)]">{sub}</div>}
+      {sub2 && <div className="num text-[11px] text-[var(--text-2)]">{sub2}</div>}
     </div>
   );
 }
