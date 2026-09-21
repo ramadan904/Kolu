@@ -12,6 +12,16 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/** Hostname only — the path and query of a provider URL hold its key. */
+function rpcHost(url: string | undefined): string {
+  if (!url) return "api.mainnet-beta.solana.com";
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "invalid SOLANA_RPC_URL";
+  }
+}
+
 /**
  * One URL that answers the questions QA and a judge actually have:
  * is this live or demo, which symbols is it asking for, how many resolved, and
@@ -102,6 +112,10 @@ export async function GET() {
       execution: {
         mintsConfigured: mints.quote !== null,
         quotableTickers,
+        // Which Solana RPC the wallet relay forwards to. Never the URL itself:
+        // a dedicated provider's URL carries its API key.
+        walletRpc: process.env.SOLANA_RPC_URL ? "dedicated" : "public (rate-limited)",
+        walletRpcHost: rpcHost(process.env.SOLANA_RPC_URL),
       },
       build: {
         commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
