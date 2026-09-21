@@ -87,11 +87,13 @@ oracle confidence band drawn around zero.
 | **Feed stalled** | Market is open and the reference has stopped ticking — upstream problem |
 | **No data** | A leg is missing. Nothing is guessed |
 
-**History, with the closures shaded.** The 48h shape is modelled and drawn
-dashed; readings this browser has actually seen are drawn solid over it. Real
-history cannot live in a serverless process — every request may land on a fresh
-instance — so it is recorded in the browser, and the chart never lets the two
-be confused.
+**History, with the closures shaded — from real trades.** The 48h chart is built
+per pair from the xStock's deepest on-chain pool (15-minute candles,
+GeckoTerminal) against the real share's exchange prints (Yahoo, pre/post
+included), each candle measured against the last print at or before it — so the
+overnight gap is measured against the stale print a trader actually has. When a
+source is down or rate-limited, a modelled shape is drawn instead, dashed and
+labelled, and never confused with the real line.
 
 **The mechanism, shaded.** Expand a row and the 48h basis chart
 shows the mechanism rather than asserting it: the gap sits pinned near zero

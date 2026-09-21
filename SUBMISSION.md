@@ -34,10 +34,12 @@ two error bars overlapping — so Kolu draws that band on the chart and greys ou
 anything that fails to escape it.
 
 **It tells you whether the gap is opening or closing.** The 48h chart shades the
-periods when the underlying market was shut. You can watch the basis sit pinned
-near zero through the session, open once the market closes, and collapse at the
-next open. That shape is the whole thesis, and it is visible rather than
-asserted.
+periods when the underlying market was shut, and it is drawn from real trades:
+the xStock's own on-chain pool candles against the real share's last exchange
+print. You can watch the gap widen across the overnight closure and snap back
+at the open. Measured over 48h: TSLAX averaged ~19bps off its share while the
+market was open and ~39bps while it was shut; NVDAX 28bps vs 48bps. That shape
+is the whole thesis, and it is shown from data rather than asserted.
 
 **It tells you what the gap is worth, and what kind of trade it is.** Set your
 size and Kolu breaks out swap fees per leg, price impact measured from a live

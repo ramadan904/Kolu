@@ -213,6 +213,14 @@ unlabelled.
       link and **no retry button** — it must never say "nothing was filled"
       unless the blockhash has expired and the signature is absent.
 
+### Real history
+
+- [ ] Open a ticket: the chart legend reads *real · pool trades vs exchange
+      prints* and the line is solid. `/api/history?ticker=TSLA` returns
+      `"source":"market"`. If GeckoTerminal is rate-limiting, the dashed
+      *modelled* fallback appears instead — labelled, never mixed with the real
+      line. A replay always shows the modelled shape.
+
 ### Links, activity, first visit, mobile
 
 - [ ] `?trade=TSLA&side=sell` opens the TSLAX ticket on Sell; `?trade=COIN`
