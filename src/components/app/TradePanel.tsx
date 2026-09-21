@@ -52,7 +52,7 @@ type TxState =
   | { kind: "idle" }
   | { kind: "building" }
   | { kind: "signing" }
-  | { kind: "sending"; signature?: string }
+  | { kind: "sending"; signature?: string; since?: number }
   | { kind: "done"; signature: string; side: Side; spent: number; received: number | null }
   /** Sent, but the chain has not said either way. Must not be retried blindly. */
   | { kind: "unconfirmed"; signature: string }
@@ -383,7 +383,7 @@ export function TradePanel({
         maxRetries: 3,
         skipPreflight: false,
       });
-      setTx({ kind: "sending", signature });
+      setTx({ kind: "sending", signature, since: Date.now() });
 
       const outcome = await pollConfirmation(connection, signature, lastValidBlockHeight);
       // A landed transaction can still have failed — slippage reverts on-chain.
@@ -973,17 +973,7 @@ export function TradePanel({
             <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-[var(--text-3)]">
               <span>
                 {tx.kind === "sending" && tx.signature ? (
-                  <>
-                    Submitted ·{" "}
-                    <a
-                      className="underline hover:text-white"
-                      href={`https://solscan.io/tx/${tx.signature}`}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                    >
-                      track on Solscan
-                    </a>
-                  </>
+                  <Confirming signature={tx.signature} since={tx.since ?? Date.now()} />
                 ) : (
                   "Routed by Jupiter · only your wallet can sign"
                 )}
@@ -1189,5 +1179,38 @@ function Steps({ steps }: { steps: { label: string; state: StepState; hint?: str
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * The minute between submit and verdict, made legible. Most swaps confirm in a
+ * few seconds; one that has not by 20s is either congested or will never land,
+ * and the honest thing is to say which outcomes are possible and when.
+ */
+function Confirming({ signature, since }: { signature: string; since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+  const seconds = Math.max(0, Math.round((now - since) / 1000));
+  return (
+    <>
+      Submitted · <span className="num">{seconds}s</span> ·{" "}
+      <a
+        className="underline hover:text-white"
+        href={`https://solscan.io/tx/${signature}`}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        track on Solscan
+      </a>
+      {seconds >= 20 && (
+        <span className="text-[var(--warn)]">
+          {" "}
+          · slower than usual — it will land or expire within ~90s; nothing fills twice
+        </span>
+      )}
+    </>
   );
 }

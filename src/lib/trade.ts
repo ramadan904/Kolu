@@ -33,7 +33,7 @@ export function describeTradeError(
     return `Not enough ${ctx.payUnit} for this size. Nothing was filled.`;
   }
   if (/blockhash not found|block height exceeded|expired/i.test(msg)) {
-    return "The quote expired before the swap landed. Nothing was filled — retry for a fresh quote.";
+    return "The swap never landed and has now expired. Nothing was filled — retry for a fresh quote.";
   }
   if (/429|rate limit/i.test(msg)) {
     return "The network is rate limiting requests. Wait a few seconds and retry.";
