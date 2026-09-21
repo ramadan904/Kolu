@@ -39,15 +39,19 @@ export function Hero({
   /** Replays a modelled dislocation, for a board with nothing to show. */
   onReplay?: () => void;
 }) {
-  const replay = onReplay ? (
-    <button
-      type="button"
-      onClick={onReplay}
-      className="mt-4 text-[13px] text-[var(--accent)] underline-offset-2 hover:underline"
-    >
-      Quiet right now — see what Kolu does when a gap opens →
-    </button>
-  ) : null;
+  // Offered whenever nothing on the board pays — quiet, or a real gap that
+  // does not yet cover costs — so the acting state is always one click away.
+  const replayButton = (label: string) =>
+    onReplay ? (
+      <button
+        type="button"
+        onClick={onReplay}
+        className="mt-4 block text-[13px] text-[var(--accent)] underline-offset-2 hover:underline"
+      >
+        {label}
+      </button>
+    ) : null;
+  const replay = replayButton("Quiet right now — see what Kolu does when a gap opens →");
   // What a quiet board offers instead of a trade: be told when there is one.
   const armAction =
     onArmBreakeven && breakevenBps ? (
@@ -186,6 +190,7 @@ export function Hero({
       {/* The gap is real but does not pay yet: the useful next step is to be
           told when it does, not to trade it now. */}
       {edge.netBps <= 0 && armAction}
+      {edge.netBps <= 0 && replayButton("Nothing pays yet — see what Kolu does when a gap does →")}
     </section>
   );
 }
