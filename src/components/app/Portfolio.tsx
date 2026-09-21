@@ -143,7 +143,11 @@ export function Portfolio({
 
   const cash = mints?.quote ? (balances.get(mints.quote.mint)?.amount ?? 0) : 0;
   const invested = holdings.reduce((sum, h) => sum + h.value, 0);
-  const exposure = holdings.reduce((sum, h) => sum + (h.convergence ?? 0), 0);
+  // Only gaps the board calls a signal count. A gap inside the noise floor is
+  // not a claim about the world, so it is not a claim about this portfolio.
+  const isSignal = (r: BasisReading) => r.signal === "actionable" || r.signal === "stale_reference";
+  const exposure = holdings.reduce((sum, h) => sum + (isSignal(h.reading) ? (h.convergence ?? 0) : 0), 0);
+  const signalCount = holdings.filter((h) => isSignal(h.reading)).length;
   const address = owner;
 
   const header = (
@@ -165,9 +169,9 @@ export function Portfolio({
         {holdings.length > 0 && (
           <Stat
             label="If gaps close"
-            value={signedUsd(exposure)}
-            color={pnlColor(exposure)}
-            title="Change in the value of your xStocks if every token converged to its real share price now."
+            value={signalCount === 0 ? "All within noise" : signedUsd(exposure)}
+            color={signalCount === 0 ? "var(--text-3)" : pnlColor(exposure)}
+            title="Change in the value of your xStocks if every gap outside the noise floor closed now — the token converging to its real share price. Gaps inside the noise floor are not counted."
           />
         )}
       </div>
@@ -272,8 +276,9 @@ export function Portfolio({
           {holdings.map(({ reading: r, amount, value, convergence }) => {
             // Holding the rich side, selling captures the premium; holding the
             // cheap side, adding captures the discount. That action leads.
-            const lead = r.basisBps === null || r.basisBps === 0 ? null : sideForGap(r.basisBps);
-            const muted = r.signal === "noise" || r.signal === "degraded_feed";
+            // Only when the gap is a signal — otherwise neither side captures anything.
+            const lead = !isSignal(r) || !r.basisBps ? null : sideForGap(r.basisBps);
+            const muted = !isSignal(r);
             return (
               <tr key={r.ticker} className="border-t border-[var(--border)]">
                 <td className="py-2.5">
@@ -295,8 +300,15 @@ export function Portfolio({
                 >
                   {r.basisBps === null ? "—" : fmtPct(r.basisBps)}
                 </td>
-                <td className="num py-2.5 text-right" style={{ color: pnlColor(convergence ?? 0) }}>
+                <td
+                  className="num py-2.5 text-right"
+                  style={{ color: muted ? "var(--text-3)" : pnlColor(convergence ?? 0) }}
+                  title={muted ? "Inside the noise floor — not counted as a real gap" : undefined}
+                >
                   {convergence === null ? "—" : signedUsd(convergence)}
+                  {muted && convergence !== null && (
+                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.06em]">noise</span>
+                  )}
                 </td>
                 <td className="py-2.5 text-right">
                   <span className="inline-flex gap-1.5">

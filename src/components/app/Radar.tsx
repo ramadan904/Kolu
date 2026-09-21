@@ -234,6 +234,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </p>
       )}
 
+      <div className="mt-4" />
       <Portfolio
         readings={board.readings}
         mints={mints}

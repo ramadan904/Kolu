@@ -63,6 +63,16 @@ export function TradeDrawer({
 
   const discount = (reading.basisBps ?? 0) < 0;
   const gapUsd = Math.abs(reading.basisUsd ?? 0);
+  // "Trading cheap" is a claim. It is only made when the board calls the gap
+  // a signal; otherwise the header says what the board concluded instead.
+  const signal = reading.signal === "actionable" || reading.signal === "stale_reference";
+  const status: { tone: "down" | "up" | "warn" | "neutral"; text: string } = signal
+    ? { tone: discount ? "down" : "up", text: discount ? "Trading cheap" : "Trading rich" }
+    : reading.signal === "degraded_feed"
+      ? { tone: "warn", text: "Feed stalled" }
+      : reading.signal === "noise"
+        ? { tone: "neutral", text: "Within noise" }
+        : { tone: "neutral", text: "No data" };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -76,7 +86,7 @@ export function TradeDrawer({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative flex h-full w-full max-w-[560px] flex-col border-l border-[var(--border)] bg-[var(--surface)] outline-none"
+        className="relative flex h-full w-full max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] outline-none"
       >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4 sm:px-6">
           <div className="min-w-0">
@@ -84,9 +94,7 @@ export function TradeDrawer({
               <h2 className="text-[22px] font-semibold tracking-[-0.025em]">
                 {reading.tokenTicker}
               </h2>
-              <Badge tone={discount ? "down" : "up"}>
-                {discount ? "Trading cheap" : "Trading rich"}
-              </Badge>
+              <Badge tone={status.tone}>{status.text}</Badge>
             </div>
             <p className="mt-0.5 truncate text-[13px] text-[var(--text-3)]">{reading.name}</p>
           </div>
@@ -117,7 +125,7 @@ export function TradeDrawer({
             label="Gap"
             value={reading.basisBps === null ? "—" : fmtPct(reading.basisBps)}
             sub={reading.basisBps === null ? undefined : `${fmtUsd(gapUsd)} per share`}
-            tone={discount ? "down" : "up"}
+            tone={signal ? (discount ? "down" : "up") : undefined}
           />
         </div>
 
@@ -131,26 +139,26 @@ export function TradeDrawer({
             hedgeable={hedgeable}
             mints={mints}
             initialSide={initialSide}
-          />
+          >
+            {history && (
+              <div className="border-t border-[var(--border)] pt-6">
+                <BasisChart series={history} observed={observed} />
+              </div>
+            )}
 
-          {history && (
-            <div className="mt-7 border-t border-[var(--border)] pt-6">
-              <BasisChart series={history} observed={observed} />
+            <div className={`border-t border-[var(--border)] pt-6 ${history ? "mt-7" : ""}`}>
+              <AlertControl
+                ticker={reading.ticker}
+                tokenTicker={reading.tokenTicker}
+                currentBps={reading.basisBps}
+                rules={rules}
+                permission={permission}
+                onAdd={onAddRule}
+                onRemove={onRemoveRule}
+                onRequestPermission={onRequestPermission}
+              />
             </div>
-          )}
-
-          <div className="mt-7 border-t border-[var(--border)] pt-6">
-            <AlertControl
-              ticker={reading.ticker}
-              tokenTicker={reading.tokenTicker}
-              currentBps={reading.basisBps}
-              rules={rules}
-              permission={permission}
-              onAdd={onAddRule}
-              onRemove={onRemoveRule}
-              onRequestPermission={onRequestPermission}
-            />
-          </div>
+          </TradePanel>
         </div>
       </div>
     </div>

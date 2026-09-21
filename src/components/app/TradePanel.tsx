@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import type { BasisReading } from "@/lib/basis/compute";
@@ -97,12 +97,18 @@ export function TradePanel({
   hedgeable,
   mints,
   initialSide,
+  children,
 }: {
   reading: BasisReading;
   hedgeable: boolean;
   mints: MintMap | null;
   /** Set when the ticket is opened from a holding with an explicit Buy or Sell. */
   initialSide?: Side;
+  /**
+   * Context rendered below the controls (chart, alerts). Passed in rather than
+   * placed after the panel so the action bar stays pinned while it scrolls.
+   */
+  children?: ReactNode;
 }) {
   const { publicKey, signTransaction, connected } = useWallet();
   const { connection } = useConnection();
@@ -110,6 +116,10 @@ export function TradePanel({
 
   const gapSide = sideForGap(reading.basisBps);
   const hasGap = reading.basisBps !== null && reading.basisBps !== 0;
+  // Whether the board calls this gap a signal. A gap inside the noise floor,
+  // or one measured against a stalled feed, has a sign but no meaning — the
+  // ticket must not tell anyone they are "capturing" it.
+  const gapIsSignal = reading.signal === "actionable" || reading.signal === "stale_reference";
 
   const [side, setSide] = useState<Side>(initialSide ?? gapSide);
   const [unit, setUnit] = useState<Unit>("usd");
@@ -122,7 +132,8 @@ export function TradePanel({
   const [tick, setTick] = useState(0);
   const [tx, setTx] = useState<TxState>({ kind: "idle" });
 
-  const against = hasGap && side !== gapSide;
+  // Taking the wrong side of a gap only means something when the gap does.
+  const against = gapIsSignal && hasGap && side !== gapSide;
   const tokenPrice = reading.token?.price ?? 0;
   const parsed = Number(input);
   const notional =
@@ -373,13 +384,32 @@ export function TradePanel({
       : edge.tone === "caution"
         ? "var(--warn)"
         : "var(--up)";
+  const gapPct =
+    reading.basisBps === null ? "" : `${(Math.abs(reading.basisBps) / 100).toFixed(2)}%`;
+  const gapWord = (reading.basisBps ?? 0) > 0 ? "premium" : "discount";
+
+  const primaryLabel = !sizeValid
+    ? "Enter a size"
+    : shortfall
+      ? `Not enough ${payUnit}`
+      : tx.kind === "building"
+        ? "Preparing swap"
+        : tx.kind === "signing"
+          ? "Approve in your wallet"
+          : tx.kind === "sending"
+            ? "Confirming on Solana"
+            : quote?.available
+              ? `${side === "sell" ? "Sell" : "Buy"} ${reading.tokenTicker} · ${fmtUsd(notional, notional >= 1000 ? 0 : 2)}`
+              : quoting
+                ? "Getting a quote"
+                : "Route unavailable";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-      <div className="space-y-5">
-        {/* Side. The one that captures the gap is marked, the other is still
-            available — someone exiting a position needs it. */}
-        <div>
+    <div>
+      <div className="space-y-6">
+        {/* Side. The one that captures the gap is marked only when the board
+            calls the gap a signal; the other side stays available for exits. */}
+        <section>
           <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] p-0.5">
             {(["buy", "sell"] as const).map((s) => (
               <button
@@ -388,39 +418,43 @@ export function TradePanel({
                 onClick={() => setSide(s)}
                 aria-pressed={side === s}
                 disabled={busy}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] py-1.5 text-[13px] font-medium transition-colors ${
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-[5px] py-2 text-[13px] font-medium transition-colors ${
                   side === s
                     ? "bg-[var(--raised)] text-white"
                     : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                 }`}
               >
-                {s === "buy" ? "Buy" : "Sell"}
-                {hasGap && s === gapSide && <Dot tone="down" />}
+                {s === "buy" ? "Buy" : "Sell"} {reading.tokenTicker}
+                {gapIsSignal && s === gapSide && <Dot tone="down" />}
               </button>
             ))}
           </div>
           {hasGap && reading.basisBps !== null && (
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-3)]">
-              {against ? (
+              {!gapIsSignal ? (
+                reading.signal === "degraded_feed" ? (
+                  "The real-share price has stopped updating, so this gap is not a reliable signal either way."
+                ) : (
+                  "Inside the noise floor — there is no gap to capture here, only costs to pay."
+                )
+              ) : against ? (
                 <>
                   {side === "buy" ? "Buying" : "Selling"} here{" "}
                   <span className="text-[var(--up)]">pays</span> the{" "}
-                  <span className="num">{(Math.abs(reading.basisBps) / 100).toFixed(2)}%</span>{" "}
-                  {reading.basisBps > 0 ? "premium" : "discount"}.
+                  <span className="num">{gapPct}</span> {gapWord}. Worth it to exit, not to trade the gap.
                 </>
               ) : (
                 <>
                   {side === "buy" ? "Buying" : "Selling"}{" "}
                   <span className="text-[var(--down)]">captures</span> the{" "}
-                  <span className="num">{(Math.abs(reading.basisBps) / 100).toFixed(2)}%</span>{" "}
-                  {reading.basisBps > 0 ? "premium" : "discount"}.
+                  <span className="num">{gapPct}</span> {gapWord}.
                 </>
               )}
             </p>
           )}
-        </div>
+        </section>
 
-        <div>
+        <section>
           <div className="flex items-baseline justify-between">
             <label
               htmlFor={`size-${reading.ticker}`}
@@ -435,7 +469,8 @@ export function TradePanel({
                 className="text-[12px] text-[var(--text-3)] transition-colors hover:text-white"
                 title="Use the full balance"
               >
-                <span className="num">{fmtAmount(held)}</span> {payUnit} · Max
+                <span className="num">{fmtAmount(held)}</span> {payUnit} available ·{" "}
+                <span className="text-[var(--accent)]">Max</span>
               </button>
             )}
           </div>
@@ -452,8 +487,15 @@ export function TradePanel({
               disabled={busy}
               placeholder="0"
               onChange={(e) => setInput(e.target.value)}
-              className="num w-full min-w-0 bg-transparent px-2 py-2.5 text-[15px] outline-none"
+              className="num w-full min-w-0 bg-transparent px-2 py-2.5 text-[16px] outline-none"
             />
+            <span className="num mr-3 hidden shrink-0 text-[12px] text-[var(--text-3)] sm:inline">
+              {sizeValid
+                ? unit === "usd"
+                  ? `≈ ${fmtAmount(tokens)} ${reading.tokenTicker}`
+                  : `≈ ${fmtUsd(notional)}`
+                : ""}
+            </span>
             <div className="mr-1.5 flex shrink-0 rounded-[5px] bg-[var(--raised)] p-0.5 text-[11px]">
               {(["usd", "token"] as const).map((u) => (
                 <button
@@ -470,18 +512,14 @@ export function TradePanel({
               ))}
             </div>
           </div>
-          <p className="num mt-1.5 text-[12px] text-[var(--text-3)]">
-            {sizeValid
-              ? unit === "usd"
-                ? `≈ ${fmtAmount(tokens)} ${reading.tokenTicker}`
-                : `≈ ${fmtUsd(notional)}`
-              : "Enter a size"}
-          </p>
 
-          <div className="mt-3 text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-            Net edge by size
+          <div className="mt-4 flex items-baseline justify-between">
+            <span className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+              Net edge by size
+            </span>
+            <span className="text-[11px] text-[var(--text-3)]">live Jupiter quotes</span>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <div className="mt-2 grid grid-cols-4 gap-1.5">
             {SIZES.map((size) => {
               const active = Math.abs(notional - size) < 0.5;
               // Jupiter routes each request independently, so two quotes for
@@ -497,34 +535,34 @@ export function TradePanel({
                   onClick={() => setSize(size)}
                   aria-pressed={active}
                   disabled={busy}
-                  className={`flex items-baseline justify-between rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-left transition-colors ${
+                  className={`rounded-[var(--radius-sm)] border px-2.5 py-2 text-left transition-colors ${
                     active
                       ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                       : "border-[var(--border)] hover:border-[var(--border-strong)]"
                   }`}
                 >
-                  <span className={`num text-[12px] ${active ? "text-[var(--accent)]" : "text-[var(--text-2)]"}`}>
+                  <span className={`num block text-[12px] ${active ? "text-[var(--accent)]" : "text-[var(--text-2)]"}`}>
                     ${size >= 1000 ? `${size / 1000}k` : size}
                   </span>
                   {!q ? (
-                    <span className="skeleton h-3 w-10" aria-label="Quoting" />
+                    <span className="skeleton mt-1.5 block h-3.5 w-12" aria-label="Quoting" />
                   ) : cellEdge ? (
                     <span
-                      className="num text-[12px]"
+                      className="num mt-1 block text-[13px] font-medium"
                       style={{ color: cellEdge.netBps > 0 ? "var(--down)" : "var(--text-3)" }}
                     >
                       {fmtBps(cellEdge.netBps, 0)}
                     </span>
                   ) : (
-                    <span className="text-[11px] text-[var(--text-3)]">no route</span>
+                    <span className="mt-1 block text-[12px] text-[var(--text-3)]">no route</span>
                   )}
                 </button>
               );
             })}
           </div>
-        </div>
+        </section>
 
-        <div>
+        <section>
           <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
             Max slippage
           </div>
@@ -546,67 +584,38 @@ export function TradePanel({
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        <dl className="space-y-2 text-[13px]">
-          <Line label={against ? "Gap (paid)" : "Gross gap"} value={edge ? fmtBps(edge.grossBps, 1) : "—"} />
-          <Line label="Swap fees" value={edge ? `−${edge.breakdown[0].bps.toFixed(1)}bps` : "—"} muted />
-          <Line
-            label="Price impact"
-            value={quoting && !quote ? "…" : edge ? `−${edge.breakdown[1].bps.toFixed(1)}bps` : "—"}
-            muted
-            hint={quote?.available ? "measured" : "assumed"}
-          />
-          <Line label="Network fee" value={edge ? `−${edge.breakdown[2].bps.toFixed(1)}bps` : "—"} muted />
-        </dl>
-      </div>
-
-      <div className="space-y-4">
-        {/* What happens, in units — the numbers someone checks against the
-            wallet's own confirmation screen. */}
-        <div className="rounded-[var(--radius)] bg-[var(--raised)] p-4">
-          <div className="flex items-baseline justify-between text-[13px]">
-            <span className="text-[var(--text-2)]">You pay</span>
-            <span className="num">
-              {sizeValid ? `${fmtAmount(needed)} ${payUnit}` : "—"}
-            </span>
+        <section className="rounded-[var(--radius)] bg-[var(--raised)] p-4">
+          <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+            What survives at this size
           </div>
-          <div className="mt-2 flex items-baseline justify-between text-[13px]">
-            <span className="text-[var(--text-2)]">You receive</span>
-            <span className="num text-right">
-              {quoting && !received ? (
-                <span className="skeleton inline-block h-3.5 w-20 align-middle" />
-              ) : received !== null ? (
-                <>≈ {fmtAmount(received)} {receiveUnit}</>
-              ) : (
-                <span className="text-[var(--text-3)]">—</span>
-              )}
-            </span>
-          </div>
-          {minReceived !== null && (
-            <div className="mt-1 flex items-baseline justify-between text-[12px] text-[var(--text-3)]">
-              <span>At worst</span>
-              <span className="num">
-                {fmtAmount(minReceived)} {receiveUnit}
-              </span>
-            </div>
-          )}
-
+          <dl className="mt-3 space-y-2 text-[13px]">
+            <Line label={against ? "Gap (paid)" : "Gross gap"} value={edge ? fmtBps(edge.grossBps, 1) : "—"} />
+            <Line label="Swap fees" value={edge ? `−${edge.breakdown[0].bps.toFixed(1)}bps` : "—"} muted />
+            <Line
+              label="Price impact"
+              value={quoting && !quote ? "…" : edge ? `−${edge.breakdown[1].bps.toFixed(1)}bps` : "—"}
+              muted
+              hint={quote?.available ? "measured" : "assumed"}
+            />
+            <Line label="Network fee" value={edge ? `−${edge.breakdown[2].bps.toFixed(1)}bps` : "—"} muted />
+          </dl>
           <div className="hairline mt-3 flex items-baseline justify-between pt-3">
-            <span className="text-[13px] font-medium">Net edge</span>
-            <span className="text-right">
+            <span className="whitespace-nowrap text-[13px] font-medium">Net edge</span>
+            <span className="whitespace-nowrap text-right">
               <span className="num text-[22px] font-semibold" style={{ color: netColor }}>
                 {edge ? fmtBps(edge.netBps, 1) : "—"}
               </span>
               <span className="num ml-2 text-[13px] text-[var(--text-2)]">
-                {edge ? fmtUsd(edge.netUsd) : ""}
+                {edge ? signedUsd(edge.netUsd) : ""}
               </span>
             </span>
           </div>
           {risk && edge && edge.netBps > 0 && (
             <div className="mt-1 flex items-baseline justify-between text-[12px]">
               <span className="text-[var(--text-3)]">
-                At the {(slippageBps / 100).toFixed(slippageBps < 100 ? 1 : 0)}% limit
+                At the {(slippageBps / 100).toFixed(slippageBps < 100 ? 1 : 0)}% slippage limit
               </span>
               <span
                 className="num"
@@ -616,7 +625,6 @@ export function TradePanel({
               </span>
             </div>
           )}
-
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={hedgeable ? "accent" : "warn"}>{hedgeable ? "Hedgeable" : "Directional"}</Badge>
             {quote?.available && quote.route?.length ? (
@@ -628,35 +636,30 @@ export function TradePanel({
           <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-2)]">
             {edge?.caveat ?? "Enter a size to price this trade."}
           </p>
-        </div>
+        </section>
 
         {sizeValid && !quote?.available && !quoting && quote && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">{unquotedCopy(quote.reason)}</p>
         )}
-
         {risk?.toleranceExceedsEdge && !against && (
           <p className="text-[12px] leading-relaxed text-[var(--up)]">
             A fill at this slippage limit wipes out the edge. Tighten the tolerance or trade
             smaller — the gap is not wide enough to absorb {(slippageBps / 100).toFixed(1)}%.
           </p>
         )}
-
-        {shortfall && (
-          <p className="text-[12px] leading-relaxed text-[var(--warn)]">
-            This trade needs <span className="num">{fmtAmount(needed)}</span> {payUnit} and the
-            wallet holds <span className="num">{fmtAmount(held)}</span>.
-          </p>
-        )}
         {balanceError && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">{balanceError}</p>
         )}
+      </div>
 
+      {children && <div className="mt-8">{children}</div>}
+
+      {/* The decision, pinned. Whatever is scrolled into view above — the
+          chart, the alerts — what you pay, what you get, what survives and the
+          button stay in one place. */}
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-8 border-t border-[var(--border)] bg-[var(--surface)] px-5 pt-4 pb-5 sm:-mx-6 sm:px-6">
         {tx.kind === "done" ? (
-          <FilledCard
-            tx={tx}
-            tokenTicker={reading.tokenTicker}
-            onReset={() => setTx({ kind: "idle" })}
-          />
+          <FilledCard tx={tx} tokenTicker={reading.tokenTicker} onReset={() => setTx({ kind: "idle" })} />
         ) : tx.kind === "unconfirmed" ? (
           <div
             className="rounded-[var(--radius)] border border-[var(--warn)]/25 bg-[var(--warn-soft)] px-4 py-3.5"
@@ -685,70 +688,107 @@ export function TradePanel({
               </button>
             </div>
           </div>
-        ) : !connected ? (
-          <WalletButton size="lg" full label="Connect wallet to trade" />
         ) : (
           <>
-            <Button full size="lg" disabled={!canSwap} loading={busy} onClick={() => void swap()}>
-              {!sizeValid
-                ? "Enter a size"
-                : shortfall
-                  ? `Not enough ${payUnit}`
-                  : tx.kind === "building"
-                    ? "Preparing swap"
-                    : tx.kind === "signing"
-                      ? "Approve in your wallet"
-                      : tx.kind === "sending"
-                        ? "Confirming on Solana"
-                        : quote?.available
-                          ? `${side === "sell" ? "Sell" : "Buy"} ${reading.tokenTicker} · ${fmtUsd(notional, notional >= 1000 ? 0 : 2)}`
-                          : quoting
-                            ? "Getting a quote"
-                            : "Route unavailable"}
-            </Button>
-            {quote?.available && !busy && <QuoteAge at={quotedAt} />}
-          </>
-        )}
-
-        {tx.kind === "sending" && tx.signature && (
-          <p className="text-[12px] text-[var(--text-3)]">
-            Submitted.{" "}
-            <a
-              className="underline hover:text-white"
-              href={`https://solscan.io/tx/${tx.signature}`}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              Track on Solscan
-            </a>
-          </p>
-        )}
-
-        {tx.kind === "error" && (
-          <div className="rounded-[var(--radius)] border border-[var(--up)]/25 bg-[var(--up-soft)] px-4 py-3">
-            <p className="text-[13px] leading-relaxed">{tx.message}</p>
-            {tx.signature && (
-              <a
-                className="mt-1.5 inline-block text-[12px] text-[var(--text-2)] underline-offset-2 hover:text-white hover:underline"
-                href={`https://solscan.io/tx/${tx.signature}`}
-                target="_blank"
-                rel="noreferrer noopener"
+            {tx.kind === "error" && (
+              <div
+                className="mb-3 rounded-[var(--radius-sm)] border border-[var(--up)]/25 bg-[var(--up-soft)] px-3.5 py-2.5"
+                role="alert"
               >
-                View on Solscan
-              </a>
+                <p className="text-[13px] leading-relaxed">{tx.message}</p>
+                {tx.signature && (
+                  <a
+                    className="mt-1 inline-block text-[12px] text-[var(--text-2)] underline-offset-2 hover:text-white hover:underline"
+                    href={`https://solscan.io/tx/${tx.signature}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    View on Solscan
+                  </a>
+                )}
+              </div>
             )}
-          </div>
-        )}
+            {shortfall && (
+              <p className="mb-3 text-[12px] leading-relaxed text-[var(--warn)]">
+                This trade needs <span className="num">{fmtAmount(needed)}</span> {payUnit}; the
+                wallet holds <span className="num">{fmtAmount(held)}</span>.
+              </p>
+            )}
 
-        {connected && tx.kind === "idle" && (
-          <p className="text-[11px] leading-relaxed text-[var(--text-3)]">
-            Routed by Jupiter. Kolu builds the transaction; only your wallet can sign it.
-          </p>
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <div className="num min-w-0 text-[13px] leading-snug text-[var(--text-2)]">
+                {sizeValid ? (
+                  <>
+                    <div className="truncate">
+                      Pay <span className="text-white">{fmtAmount(needed)} {payUnit}</span>
+                      {" → "}receive{" "}
+                      {received !== null ? (
+                        <span className="text-white">≈ {fmtAmount(received)} {receiveUnit}</span>
+                      ) : (
+                        <span className="skeleton inline-block h-3 w-16 align-middle" />
+                      )}
+                    </div>
+                    <div className="truncate text-[12px] text-[var(--text-3)]">
+                      {minReceived !== null
+                        ? `At worst ${fmtAmount(minReceived)} ${receiveUnit} at your ${(slippageBps / 100).toFixed(1)}% limit`
+                        : " "}
+                    </div>
+                  </>
+                ) : (
+                  "Enter a size to get a quote"
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="num text-[15px] font-semibold" style={{ color: netColor }}>
+                  {edge ? fmtBps(edge.netBps, 1) : "—"}
+                </div>
+                <div className="num text-[11px] text-[var(--text-3)]">
+                  {edge ? `${signedUsd(edge.netUsd)} after round trip` : ""}
+                </div>
+              </div>
+            </div>
+
+            {!connected ? (
+              <WalletButton size="lg" full dropUp label="Connect wallet to trade" />
+            ) : (
+              <Button full size="lg" disabled={!canSwap} loading={busy} onClick={() => void swap()}>
+                {primaryLabel}
+              </Button>
+            )}
+
+            <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-[var(--text-3)]">
+              <span>
+                {tx.kind === "sending" && tx.signature ? (
+                  <>
+                    Submitted ·{" "}
+                    <a
+                      className="underline hover:text-white"
+                      href={`https://solscan.io/tx/${tx.signature}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      track on Solscan
+                    </a>
+                  </>
+                ) : (
+                  "Routed by Jupiter · only your wallet can sign"
+                )}
+              </span>
+              {quote?.available && !busy && <QuoteAge at={quotedAt} />}
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
+
+/** Signed dollars with a true minus, matching the bps figures beside them. */
+function signedUsd(value: number): string {
+  if (Math.abs(value) < 0.005) return fmtUsd(0);
+  return `${value > 0 ? "+" : "−"}${fmtUsd(Math.abs(value))}`;
+}
+
 
 function FilledCard({
   tx,
@@ -811,9 +851,9 @@ function QuoteAge({ at }: { at: number }) {
   }, []);
   const seconds = Math.max(0, Math.round((now - at) / 1000));
   return (
-    <p className="num -mt-2 text-center text-[11px] text-[var(--text-3)]">
-      Quote {seconds < 2 ? "just now" : `${seconds}s old`} · refreshes automatically
-    </p>
+    <span className="num shrink-0" title="Quotes refresh every 15s and again before you sign">
+      Quote {seconds < 2 ? "just now" : `${seconds}s old`}
+    </span>
   );
 }
 

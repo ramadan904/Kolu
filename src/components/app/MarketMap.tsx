@@ -16,7 +16,13 @@ import { fmtPct } from "@/lib/format";
  * feeds' own confidence and are not claims about the world.
  */
 
-const ROWS = 3;
+/**
+ * Label rows available. A calm board clusters every ticker around zero, which
+ * is exactly when a fixed three rows ran out and labels printed over each
+ * other; the plot grows only as tall as the rows actually used.
+ */
+const MAX_ROWS = 6;
+const MIN_ROWS = 3;
 /** Percent of the axis width a label needs before it collides with its neighbour. */
 const LABEL_WIDTH_PCT = 9;
 /** Vertical gap between label rows. Must clear the label's own line box. */
@@ -26,7 +32,7 @@ const BASE_STICK_PX = 22;
 /** Width of the invisible hit area around each tick. */
 const HIT_PX = 20;
 /** Room above the axis line for the tallest stick plus its label. */
-const PLOT_PX = BASE_STICK_PX + (ROWS - 1) * ROW_GAP_PX + 18;
+const plotPx = (rows: number) => BASE_STICK_PX + (rows - 1) * ROW_GAP_PX + 18;
 /** Room below the axis line for the −/fair/+ scale labels. */
 const SCALE_PX = 22;
 
@@ -48,12 +54,12 @@ function place(readings: BasisReading[], domain: number): Placed[] {
     .map((r) => ({ reading: r, basisBps: r.basisBps }))
     .sort((a, b) => a.basisBps - b.basisBps);
 
-  const lastX: number[] = new Array(ROWS).fill(-Infinity);
+  const lastX: number[] = new Array(MAX_ROWS).fill(-Infinity);
 
   return sorted.map(({ reading, basisBps }) => {
     const x = 50 + (Math.max(-domain, Math.min(domain, basisBps)) / domain) * 50;
     let row = 0;
-    while (row < ROWS - 1 && x - lastX[row] < LABEL_WIDTH_PCT) row += 1;
+    while (row < MAX_ROWS - 1 && x - lastX[row] < LABEL_WIDTH_PCT) row += 1;
     lastX[row] = x;
     return { reading, basisBps, x, row };
   });
@@ -93,11 +99,13 @@ export function MarketMap({
   const noisePct = Math.min(noiseBps / domain, 1) * 50;
 
   const placed = place(priced, domain);
-  // A pair whose reference stalled is drawn where its raw gap sits, but it is
-  // not counted as a dislocation — the hero and table refuse to call it one,
-  // and the map must agree with them.
+  const rows = Math.max(MIN_ROWS, ...placed.map((p) => p.row + 1));
+  // Whether a pair counts as a dislocation is the pair's own signal — the same
+  // test the table's "Within noise" label and the hero use — not the median
+  // band drawn here, which only illustrates it. A stalled reference is drawn
+  // where its raw gap sits but never counted.
   const isQuiet = (p: Placed) =>
-    p.reading.signal === "degraded_feed" || Math.abs(p.basisBps) <= noiseBps;
+    p.reading.signal !== "actionable" && p.reading.signal !== "stale_reference";
   const outliers = placed.filter((p) => !isQuiet(p)).length;
   const delayed = placed.filter((p) => p.reading.signal === "degraded_feed").length;
 
@@ -125,7 +133,7 @@ export function MarketMap({
         </p>
       </div>
 
-      <div className="relative mt-5" style={{ height: `${PLOT_PX + SCALE_PX}px` }}>
+      <div className="relative mt-5" style={{ height: `${plotPx(rows) + SCALE_PX}px` }}>
         {/* Noise band, then the axis, then the zero rule on top of both. */}
         <div
           className="absolute top-0 rounded-[3px] bg-[var(--raised)]"
@@ -150,7 +158,7 @@ export function MarketMap({
           const color = quiet ? "var(--text-3)" : discount ? "var(--down)" : "var(--up)";
           // Taller sticks sit on the top row, so every label clears the one
           // below it and each dot reads as the end of its own line.
-          const stick = BASE_STICK_PX + (ROWS - 1 - row) * ROW_GAP_PX;
+          const stick = BASE_STICK_PX + (rows - 1 - row) * ROW_GAP_PX;
           const owned = held?.has(reading.ticker) ?? false;
           const active = selected === reading.ticker;
 
@@ -189,8 +197,13 @@ export function MarketMap({
                 aria-hidden="true"
               />
               <span
-                className={`absolute top-0 left-1/2 -translate-x-1/2 text-[11px] leading-none whitespace-nowrap transition-colors group-hover:text-white ${owned || active ? "font-medium" : ""}`}
-                style={{ color: active ? "var(--text)" : quiet && !owned ? "var(--text-3)" : "var(--text-2)" }}
+                className={`absolute top-0 left-1/2 z-10 -translate-x-1/2 rounded-[3px] px-1 py-px text-[11px] leading-none whitespace-nowrap transition-colors group-hover:text-white ${owned || active ? "font-medium" : ""}`}
+                style={{
+                  color: active ? "var(--text)" : quiet && !owned ? "var(--text-3)" : "var(--text-2)",
+                  // Backed in whatever colour sits behind it, so a neighbour's
+                  // stick passes under the label instead of striking through it.
+                  background: Math.abs(x - 50) < noisePct ? "var(--raised)" : "var(--surface)",
+                }}
               >
                 {reading.tokenTicker}
               </span>

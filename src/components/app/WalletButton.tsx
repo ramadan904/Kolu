@@ -16,10 +16,13 @@ export function WalletButton({
   size = "sm",
   full = false,
   label = "Connect wallet",
+  dropUp = false,
 }: {
   size?: "sm" | "lg";
   full?: boolean;
   label?: string;
+  /** Open the wallet list above the button — for buttons pinned to the bottom. */
+  dropUp?: boolean;
 } = {}) {
   const { wallets, select, connect, disconnect, connecting, connected, publicKey, wallet } =
     useWallet();
@@ -109,7 +112,9 @@ export function WalletButton({
       </Button>
 
       {open && (
-        <div className={`panel absolute right-0 z-50 mt-2 p-1 ${full ? "left-0" : "w-60"}`}>
+        <div
+          className={`panel absolute right-0 z-50 p-1 ${dropUp ? "bottom-full mb-2" : "mt-2"} ${full ? "left-0" : "w-60"}`}
+        >
           {choices.length === 0 ? (
             <div className="px-3 py-4 text-sm text-[var(--text-2)]">
               No Solana wallet detected.
