@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import type { Adapter } from "@solana/wallet-adapter-base";
+import { BalancesProvider } from "./useBalances";
 
 /**
  * Wallet plumbing.
@@ -21,7 +22,7 @@ export function SolanaProviders({ children }: { children: React.ReactNode }) {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        {children}
+        <BalancesProvider>{children}</BalancesProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

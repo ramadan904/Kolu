@@ -51,6 +51,12 @@ export interface EdgeInput {
   costs?: Partial<CostModel>;
   /** False while the underlying market is closed — no hedge is available. */
   hedgeable: boolean;
+  /**
+   * True when the trade takes the wrong side of the gap: buying a rich token
+   * or selling a cheap one. Someone exiting a position does this on purpose,
+   * and the screen must show the gap as a cost to them, not as an edge.
+   */
+  against?: boolean;
 }
 
 export interface EdgeResult {
@@ -78,7 +84,7 @@ export function computeEdge(input: EdgeInput): EdgeResult {
   const impactBps = costs.priceImpactBps * legs;
   const networkBps = (costs.networkFeeUsd * legs / notional) * 10_000;
 
-  const grossBps = Math.abs(input.basisBps);
+  const grossBps = Math.abs(input.basisBps) * (input.against ? -1 : 1);
   const costBps = swapBps + impactBps + networkBps;
   const netBps = grossBps - costBps;
 
@@ -106,11 +112,22 @@ export function computeEdge(input: EdgeInput): EdgeResult {
       { label: "Price impact", bps: impactBps },
       { label: "Network fee", bps: networkBps },
     ],
-    caveat: caveatFor(verdict, kind),
+    caveat: caveatFor(verdict, kind, input.against === true && grossBps < 0),
   };
 }
 
-function caveatFor(verdict: EdgeVerdict, kind: EdgeKind): string {
+/** The side that captures a gap: sell a rich token, buy a cheap one. */
+export function sideForGap(basisBps: number | null): "buy" | "sell" {
+  return (basisBps ?? 0) > 0 ? "sell" : "buy";
+}
+
+function caveatFor(verdict: EdgeVerdict, kind: EdgeKind, against: boolean): string {
+  if (against) {
+    return (
+      "This side pays the gap instead of capturing it. Worth doing to exit or " +
+      "rebalance — not as a trade on the dislocation."
+    );
+  }
   if (verdict === "negative") {
     return "Costs exceed the gap. There is no trade here.";
   }

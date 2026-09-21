@@ -169,8 +169,37 @@ unlabelled.
 - [ ] **Swap a trivial size first** ($5). Confirm: transaction builds, wallet
       prompts, signature returns, Solscan link resolves, and the filled amount
       is the asset you expected. Do this before any demo.
-- [ ] Cancelling in the wallet shows "You cancelled the transaction", not a
-      stack trace.
+- [ ] Cancelling in the wallet shows "You cancelled in your wallet. Nothing
+      was sent.", not a stack trace.
+- [ ] **A reverted swap is never "Filled".** Set slippage to 0.1% on a thin
+      pair at $50k. If the transaction lands but reverts, the ticket shows the
+      slippage message with a Solscan link — not the green Filled card.
+- [ ] **The fill shows up without a reload.** After a $5 buy, the holding
+      appears in "Your position" within a second or two of "Filled".
+- [ ] **Net edge by size** fills all four cells from live quotes within a few
+      seconds; clicking a cell sets the size. Cells re-quote every ~15s.
+- [ ] **USD / token toggle** converts the entered size both ways; "Max" in
+      token mode never asks to sell more than the wallet holds.
+- [ ] **Against the gap.** On a rich token, switch to Buy: the gap line reads
+      "pays", gross gap is negative, and the caveat says so.
+
+### Positions (wallet connected)
+
+- [ ] Wallet with USDC and no xStocks: the empty state names the deepest live
+      discount and "Buy XXXX" opens the ticket on the buy side.
+- [ ] Wallet holding an xStock: its row shows quantity, value, gap and
+      "If gap closes"; the action that captures the gap is the filled button.
+- [ ] Row "Sell" opens the ticket on Sell even when the token trades cheap.
+- [ ] Switching wallets never shows the previous wallet's holdings.
+- [ ] Kill the RPC after the first read: the panel keeps the last read and
+      marks it "Stale", rather than blanking.
+
+### Board consistency
+
+- [ ] During regular hours with stalled references, the hero reads "No clean
+      read" (never "Priced in line") and the map's count excludes delayed pairs.
+- [ ] When the widest gap does not survive costs, the hero says so instead of
+      "About −Nbps survives".
 
 ## 5. Deploy & submission
 

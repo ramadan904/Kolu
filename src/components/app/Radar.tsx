@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BoardSnapshot } from "@/lib/board";
 import type { HistorySeries } from "@/lib/history";
 import {
@@ -22,8 +22,9 @@ import { Hero } from "./Hero";
 import { MarketClock } from "./MarketClock";
 import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
-import { type MintMap } from "./TradePanel";
+import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
+import { useBalances } from "./useBalances";
 
 const POLL_MS = 10_000;
 
@@ -31,6 +32,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [board, setBoard] = useState(initial);
   const [tier, setTier] = useState<"core" | "all">("core");
   const [selected, setSelected] = useState<string | null>(null);
+  // Set only when a holding asks for a specific side; otherwise the ticket
+  // opens on the side that captures the gap.
+  const [tradeSide, setTradeSide] = useState<Side | undefined>(undefined);
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [stale, setStale] = useState(false);
   const [mints, setMints] = useState<MintMap | null>(null);
@@ -159,6 +163,21 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     };
   }, [selected]);
 
+  const { balances } = useBalances();
+  const held = useMemo(() => {
+    const out = new Set<string>();
+    if (!mints) return out;
+    for (const [ticker, { mint }] of Object.entries(mints.tokens)) {
+      if ((balances.get(mint)?.amount ?? 0) > 0) out.add(ticker);
+    }
+    return out;
+  }, [mints, balances]);
+
+  const openTrade = useCallback((ticker: string, side?: Side) => {
+    setTradeSide(side);
+    setSelected(ticker);
+  }, []);
+
   const hedgeable = board.session.isRegularHours;
   const tradeable = board.readings.filter(
     (r) => r.signal === "actionable" || r.signal === "stale_reference",
@@ -168,6 +187,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     if (!best || Math.abs(r.basisBps) > Math.abs(best.basisBps ?? 0)) return r;
     return best;
   }, null);
+
+  // Pairs the board will not call a gap on because the reference stopped
+  // ticking mid-session. The hero must not describe them as "in line".
+  const delayed = board.readings.filter((r) => r.signal === "degraded_feed").length;
 
   const detail = selected ? board.readings.find((r) => r.ticker === selected) : null;
 
@@ -211,13 +234,14 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </p>
       )}
 
-      <Portfolio readings={board.readings} mints={mints} />
+      <Portfolio readings={board.readings} mints={mints} onTrade={openTrade} />
 
       <Hero
         reading={headline}
         hedgeable={hedgeable}
         session={board.session}
-        onTrade={setSelected}
+        delayed={delayed}
+        onTrade={(t) => openTrade(t)}
       />
 
       <ArmedStrip
@@ -239,7 +263,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       )}
 
-      <MarketMap readings={board.readings} onSelect={setSelected} />
+      <MarketMap
+        readings={board.readings}
+        onSelect={(t) => openTrade(t)}
+        held={held}
+        selected={selected}
+      />
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
@@ -268,16 +297,22 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         readings={board.readings}
         hedgeable={hedgeable}
         selected={selected}
-        onSelect={(t) => setSelected((cur) => (cur === t ? null : t))}
+        held={held}
+        onSelect={(t) => {
+          setTradeSide(undefined);
+          setSelected((cur) => (cur === t ? null : t));
+        }}
       />
 
       {detail && (
         <TradeDrawer
+          key={`${detail.ticker}:${tradeSide ?? "auto"}`}
           reading={detail}
           history={history}
           observed={observed}
           hedgeable={hedgeable}
           mints={mints}
+          initialSide={tradeSide}
           rules={rules}
           permission={permission}
           onAddRule={addRule}

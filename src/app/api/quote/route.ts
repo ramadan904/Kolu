@@ -17,6 +17,11 @@ function fail(reason: QuoteUnavailable, detail?: string, status = 200) {
   return NextResponse.json({ available: false, reason, detail }, { status });
 }
 
+function minOut(raw: unknown): string | null {
+  const value = (raw as { otherAmountThreshold?: unknown } | null)?.otherAmountThreshold;
+  return typeof value === "string" && /^\d+$/.test(value) ? value : null;
+}
+
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const ticker = params.get("ticker")?.toUpperCase() ?? "";
@@ -85,6 +90,10 @@ export async function GET(request: Request) {
         // BigInt is not JSON-serialisable; amounts go out as strings.
         inAmount: quote.inAmount.toString(),
         outAmount: quote.outAmount.toString(),
+        // The least the swap can deliver before it reverts at the slippage
+        // limit. Shown beside the expected amount so the tolerance is a number
+        // someone can read, not a percentage they have to multiply out.
+        minOutAmount: minOut(quote.raw),
         inDecimals: side === "buy" ? quoteMint.decimals : tokenMint.decimals,
         outDecimals: side === "buy" ? tokenMint.decimals : quoteMint.decimals,
         // Handed straight back when building the swap, unmodified.

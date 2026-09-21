@@ -8,7 +8,7 @@ import { fmtPct, fmtUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
 import { AlertControl } from "./Alerts";
 import { BasisChart } from "./BasisChart";
-import { TradePanel, type MintMap } from "./TradePanel";
+import { TradePanel, type MintMap, type Side } from "./TradePanel";
 
 /**
  * A focused surface for committing capital.
@@ -24,6 +24,7 @@ export function TradeDrawer({
   observed,
   hedgeable,
   mints,
+  initialSide,
   rules,
   permission,
   onAddRule,
@@ -36,6 +37,7 @@ export function TradeDrawer({
   observed: { t: number; basisBps: number }[];
   hedgeable: boolean;
   mints: MintMap | null;
+  initialSide?: Side;
   rules: AlertRule[];
   permission: NotificationPermission | "unsupported";
   onAddRule: (ticker: string, thresholdBps: number, direction: AlertDirection) => void;
@@ -124,7 +126,12 @@ export function TradeDrawer({
             <p className="mb-5 text-[13px] leading-relaxed text-[var(--text-2)]">{reading.note}</p>
           )}
 
-          <TradePanel reading={reading} hedgeable={hedgeable} mints={mints} />
+          <TradePanel
+            reading={reading}
+            hedgeable={hedgeable}
+            mints={mints}
+            initialSide={initialSide}
+          />
 
           {history && (
             <div className="mt-7 border-t border-[var(--border)] pt-6">

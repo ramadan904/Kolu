@@ -19,7 +19,11 @@ async function withConfig(contents: string | null) {
   }
   process.chdir(dir);
   resetMintCache();
-  return () => rm(dir, { recursive: true, force: true });
+  // Leave the directory before removing it: Windows refuses to delete the cwd.
+  return async () => {
+    process.chdir(cwd);
+    await rm(dir, { recursive: true, force: true });
+  };
 }
 
 const VALID = "So11111111111111111111111111111111111111112";

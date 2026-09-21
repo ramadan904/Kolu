@@ -12,7 +12,15 @@ function short(address: string): string {
  * Connect control. Built here rather than using the adapter's own modal, whose
  * styling cannot be reconciled with this design system.
  */
-export function WalletButton() {
+export function WalletButton({
+  size = "sm",
+  full = false,
+  label = "Connect wallet",
+}: {
+  size?: "sm" | "lg";
+  full?: boolean;
+  label?: string;
+} = {}) {
   const { wallets, select, connect, disconnect, connecting, connected, publicKey, wallet } =
     useWallet();
   const [open, setOpen] = useState(false);
@@ -95,13 +103,13 @@ export function WalletButton() {
   const choices = installed.length > 0 ? installed : wallets;
 
   return (
-    <div className="relative" ref={ref}>
-      <Button size="sm" loading={connecting} onClick={() => setOpen((v) => !v)}>
-        {connecting ? "Connecting" : "Connect wallet"}
+    <div className={`relative ${full ? "w-full" : ""}`} ref={ref}>
+      <Button size={size} full={full} loading={connecting} onClick={() => setOpen((v) => !v)}>
+        {connecting ? "Connecting" : label}
       </Button>
 
       {open && (
-        <div className="panel absolute right-0 z-50 mt-2 w-60 p-1">
+        <div className={`panel absolute right-0 z-50 mt-2 p-1 ${full ? "left-0" : "w-60"}`}>
           {choices.length === 0 ? (
             <div className="px-3 py-4 text-sm text-[var(--text-2)]">
               No Solana wallet detected.

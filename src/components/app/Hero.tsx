@@ -17,11 +17,14 @@ export function Hero({
   reading,
   hedgeable,
   session,
+  delayed = 0,
   onTrade,
 }: {
   reading: BasisReading | null;
   hedgeable: boolean;
   session: MarketSession;
+  /** Pairs flagged `degraded_feed`: excluded from the headline, never "in line". */
+  delayed?: number;
   onTrade: (ticker: string) => void;
 }) {
   // A quiet board is the normal state while the market is open — arbitrageurs
@@ -29,6 +32,29 @@ export function Hero({
   // accurate and useless; the screen should say why, and when to look again.
   if (!reading || reading.basisBps === null || reading.equity === null || reading.token === null) {
     const closesIn = timeUntilClose(session);
+
+    // "Priced in line" is a claim that the gaps were measured and found small.
+    // With stalled references nothing was measured, and the map below would
+    // show the raw gaps disagreeing with the headline.
+    if (session.isRegularHours && delayed > 0) {
+      return (
+        <section className="py-8 sm:py-10">
+          <p className="text-[13px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+            Market open · reference delayed
+          </p>
+          <p className="display mt-3 text-[40px] leading-none sm:text-[46px]">No clean read</p>
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--text-2)]">
+            {delayed === 1 ? "One real-share price has" : `${delayed} real-share prices have`} not
+            ticked in over two minutes, so Kolu will not call a gap on{" "}
+            {delayed === 1 ? "it" : "them"}. The raw numbers are below, muted, until the feed
+            catches up.{" "}
+            {closesIn && (
+              <span className="text-white">After-hours gaps open when the market closes, in {closesIn}.</span>
+            )}
+          </p>
+        </section>
+      );
+    }
     return (
       <section className="py-8 sm:py-10">
         <p className="text-[13px] uppercase tracking-[0.08em] text-[var(--text-3)]">
@@ -99,9 +125,11 @@ export function Hero({
         <span className="num text-white">{fmtUsd(gapUsd)}</span>{" "}
         {discount ? "below" : "above"} the real {reading.name} share price of{" "}
         <span className="num text-white">{fmtUsd(reading.equity.price)}</span>.{" "}
-        {hedgeable
-          ? `About ${Math.round(edge.netBps)}bps survives fees and slippage on a $10k clip.`
-          : `Worth about ${fmtUsd(Math.abs(edge.netUsd))} on a $10k position if it converges at the open.`}
+        {edge.netBps <= 0
+          ? `On a $10k clip, fees and slippage outweigh the gap by about ${Math.round(-edge.netBps)}bps — watch it, don't trade it yet.`
+          : hedgeable
+            ? `About ${Math.round(edge.netBps)}bps survives fees and slippage on a $10k clip.`
+            : `Worth about ${fmtUsd(edge.netUsd)} on a $10k position if it converges at the open.`}
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2.5">

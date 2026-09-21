@@ -1,7 +1,7 @@
 "use client";
 
 import type { BasisReading } from "@/lib/basis/compute";
-import { computeEdge } from "@/lib/basis/edge";
+import { computeEdge, DEFAULT_COSTS } from "@/lib/basis/edge";
 import { formatAge } from "@/lib/basis/compute";
 import { fmtBps, fmtPct, fmtUsd } from "@/lib/format";
 import { Dot } from "@/components/ui/Badge";
@@ -37,11 +37,13 @@ export function AssetList({
   hedgeable,
   selected,
   onSelect,
+  held,
 }: {
   readings: BasisReading[];
   hedgeable: boolean;
   selected: string | null;
   onSelect: (ticker: string) => void;
+  held?: ReadonlySet<string>;
 }) {
   const domain = Math.max(60, ...readings.map((r) => Math.abs(r.basisBps ?? 0)));
 
@@ -52,7 +54,15 @@ export function AssetList({
         <span className="hidden text-right sm:block">Token</span>
         <span className="hidden text-right sm:block">Real share</span>
         <span className="text-right">Gap</span>
-        <span className="hidden text-right sm:block">Net at $10k</span>
+        {/* Labelled as an estimate because it is one: the board assumes the
+            default price impact for every pair, while the ticket measures it.
+            Same formula, different input — the label says which. */}
+        <span
+          className="hidden text-right sm:block"
+          title={`Estimated with ${DEFAULT_COSTS.priceImpactBps}bps assumed price impact per leg. The trade ticket measures it live.`}
+        >
+          Net at $10k <span className="normal-case tracking-normal">est.</span>
+        </span>
       </div>
 
       <ul>
@@ -77,6 +87,11 @@ export function AssetList({
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium">{r.tokenTicker}</span>
                     {r.signal === "degraded_feed" && <Dot tone="warn" />}
+                    {held?.has(r.ticker) && (
+                      <span className="rounded-full border border-[var(--border-strong)] px-1.5 text-[10px] leading-[16px] text-[var(--text-2)]">
+                        Held
+                      </span>
+                    )}
                     <svg
                       className="opacity-0 transition-opacity group-hover:opacity-100"
                       width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"

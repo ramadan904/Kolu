@@ -62,9 +62,14 @@ function place(readings: BasisReading[], domain: number): Placed[] {
 export function MarketMap({
   readings,
   onSelect,
+  held,
+  selected = null,
 }: {
   readings: BasisReading[];
   onSelect: (ticker: string) => void;
+  /** Tickers the connected wallet holds — ringed, so exposure reads on the map. */
+  held?: ReadonlySet<string>;
+  selected?: string | null;
 }) {
   const priced = readings.filter((r) => r.basisBps !== null);
   if (priced.length < 2) return null;
@@ -85,7 +90,13 @@ export function MarketMap({
   const noisePct = Math.min(noiseBps / domain, 1) * 50;
 
   const placed = place(priced, domain);
-  const outliers = placed.filter((p) => Math.abs(p.basisBps) > noiseBps).length;
+  // A pair whose reference stalled is drawn where its raw gap sits, but it is
+  // not counted as a dislocation — the hero and table refuse to call it one,
+  // and the map must agree with them.
+  const isQuiet = (p: Placed) =>
+    p.reading.signal === "degraded_feed" || Math.abs(p.basisBps) <= noiseBps;
+  const outliers = placed.filter((p) => !isQuiet(p)).length;
+  const delayed = placed.filter((p) => p.reading.signal === "degraded_feed").length;
 
   return (
     <section className="panel mb-5 px-4 pb-4 pt-3.5 sm:px-5">
@@ -95,12 +106,18 @@ export function MarketMap({
         </h2>
         <p className="text-[12px] text-[var(--text-3)]">
           {outliers === 0 ? (
-            "Every pair inside the noise floor"
+            delayed > 0 ? "No clean dislocations" : "Every pair inside the noise floor"
           ) : (
             <>
               <span className="num text-white">{outliers}</span> of{" "}
               <span className="num">{placed.length}</span> outside the noise floor
             </>
+          )}
+          {delayed > 0 && (
+            <span className="text-[var(--warn)]">
+              {" "}
+              · <span className="num">{delayed}</span> reference{delayed === 1 ? "" : "s"} delayed
+            </span>
           )}
         </p>
       </div>
@@ -123,21 +140,25 @@ export function MarketMap({
           aria-hidden="true"
         />
 
-        {placed.map(({ reading, basisBps, x, row }) => {
+        {placed.map((p) => {
+          const { reading, basisBps, x, row } = p;
           const discount = basisBps < 0;
-          const quiet = Math.abs(basisBps) <= noiseBps;
+          const quiet = isQuiet(p);
           const color = quiet ? "var(--text-3)" : discount ? "var(--down)" : "var(--up)";
           // Taller sticks sit on the top row, so every label clears the one
           // below it and each dot reads as the end of its own line.
           const stick = BASE_STICK_PX + (ROWS - 1 - row) * ROW_GAP_PX;
+          const owned = held?.has(reading.ticker) ?? false;
+          const active = selected === reading.ticker;
 
           return (
             <button
               key={reading.ticker}
               type="button"
               onClick={() => onSelect(reading.ticker)}
-              title={`${reading.tokenTicker} · ${fmtPct(basisBps)} · ${reading.name}`}
-              aria-label={`${reading.tokenTicker}, ${fmtPct(basisBps)} against ${reading.name}`}
+              title={`${reading.tokenTicker} · ${fmtPct(basisBps)} · ${reading.name}${owned ? " · you hold this" : ""}`}
+              aria-label={`${reading.tokenTicker}, ${fmtPct(basisBps)} against ${reading.name}${owned ? ", held" : ""}`}
+              aria-pressed={active}
               // An explicit box: with only absolutely-positioned children the
               // button collapses to zero width and cannot be clicked at all.
               className="group absolute -translate-x-1/2 cursor-pointer"
@@ -155,12 +176,18 @@ export function MarketMap({
               />
               <span
                 className="absolute left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
-                style={{ bottom: `${stick - 3}px`, background: color, opacity: quiet ? 0.5 : 1 }}
+                style={{
+                  bottom: `${stick - 3}px`,
+                  background: color,
+                  opacity: quiet && !owned ? 0.5 : 1,
+                  // A ring, not a colour change: colour already carries direction.
+                  boxShadow: owned ? `0 0 0 2px var(--surface), 0 0 0 3.5px ${color}` : undefined,
+                }}
                 aria-hidden="true"
               />
               <span
-                className="absolute top-0 left-1/2 -translate-x-1/2 text-[11px] leading-none whitespace-nowrap transition-colors group-hover:text-white"
-                style={{ color: quiet ? "var(--text-3)" : "var(--text-2)" }}
+                className={`absolute top-0 left-1/2 -translate-x-1/2 text-[11px] leading-none whitespace-nowrap transition-colors group-hover:text-white ${owned || active ? "font-medium" : ""}`}
+                style={{ color: active ? "var(--text)" : quiet && !owned ? "var(--text-3)" : "var(--text-2)" }}
               >
                 {reading.tokenTicker}
               </span>
@@ -183,6 +210,19 @@ export function MarketMap({
         Left of centre trades below the real share; right of centre trades above it.
         The shaded middle is the feeds&rsquo; own confidence — anything inside it is
         noise, not a dislocation.
+        {held && held.size > 0 && (
+          <>
+            {" "}
+            <span className="whitespace-nowrap">
+              <span
+                className="mx-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                style={{ background: "var(--text-2)", boxShadow: "0 0 0 2px var(--surface), 0 0 0 3.5px var(--text-2)" }}
+                aria-hidden="true"
+              />
+              Ringed pairs are in your wallet.
+            </span>
+          </>
+        )}
       </p>
     </section>
   );
