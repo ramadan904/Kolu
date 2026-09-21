@@ -24,21 +24,31 @@ Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
    around zero is the two oracles' combined confidence — anything that fails to
    escape it is greyed out and labelled *Within noise*, because it is not signal.
 
-3. **Expand that row.** The chart is the thesis. Shaded = the underlying market
-   was shut. The basis sits pinned near zero through the session, opens the
-   moment the market closes, and collapses at the next open.
+3. **Open the trade ticket** (Trade, or click any row or map tick). The side
+   that captures the gap is pre-selected — sell a rich token, buy a cheap one.
+   *Net edge by size* prices $500 / $2k / $10k / $50k from live Jupiter quotes,
+   so you can see where the trade stops paying. The cost breakdown shows gross
+   gap, fees, measured impact and what survives; on a closed market the caveat
+   reads **Directional, not an arbitrage**. The chart below is the thesis:
+   shaded = the underlying was shut, and the basis opens exactly then.
 
-4. **Look at the cost breakdown.** Gross gap, swap fees per leg, price impact,
-   network cost, and what survives. Then the caveat: on a closed market it reads
-   **Directional, not an arbitrage** — there is no short leg available, so this
-   is a bet on convergence. That number is never shown in confident green.
+4. **See a real portfolio without a wallet.** In *Your position*, paste any
+   Solana address — an exchange hot wallet from Solscan's TSLAx holders tab
+   works — and its actual xStock holdings are valued against the live gaps,
+   read-only, with what each would gain or lose if its gap closed. Rings on the
+   map and *Held* tags in the table show the same exposure.
 
-5. **Arm an alert.** Alerts → threshold → Arm. It fires on the next poll. What
-   matters is what it refuses to fire on: a gap inside the noise floor, or one
-   measured against a feed that has stopped ticking.
+5. **Connect a wallet to trade.** Your holdings replace the watched address;
+   Buy/Sell on a holding opens the ticket on that side. A $5 swap goes quote →
+   approve in wallet → confirming → *Filled* with a Solscan link, and the
+   position updates without a reload. A swap that reverts on-chain is never
+   shown as filled.
 
-6. **Check `/api/health`** if you want to know whether you are looking at live
-   oracle data or labelled demo data. It says so explicitly.
+6. **Arm an alert.** Alerts → threshold → Arm. What matters is what it refuses
+   to fire on: a gap inside the noise floor, or a feed that stopped ticking.
+
+7. **Check `/api/health`** for live vs labelled demo data, and which Solana RPC
+   the wallet relay is using.
 
 ---
 
@@ -94,10 +104,19 @@ fill lands at the edge of your tolerance, and says so when that tolerance is
 wider than the edge itself. A default 0.5% slippage quietly eating most of an
 83bps gap is the exact failure this product exists to prevent.
 
-**Balance-aware trading.** Connect a wallet and the ticket reads what you
-actually hold — both token programs, since xStocks are Token-2022 and USDC is
-not. Clicking your balance fills the size. A trade larger than your holdings is
-blocked before it reaches the wallet, rather than failing at the prompt.
+**Positions against the gap.** Connect a wallet — or paste any address to view
+it read-only — and *Your position* values every xStock held (both token
+programs, since xStocks are Token-2022 and USDC is not) against the live gaps:
+quantity, value, gap, and what each holding gains or loses if the token
+converges to the real share. Holdings outside the table's filter are listed,
+never silently dropped from the total.
+
+**Balance-aware trading.** The ticket reads what you hold; *Max* fills the size.
+A trade larger than your holdings is blocked before it reaches the wallet.
+Quotes older than 10s are refreshed before signing. Confirmation is polled, and
+the outcome is only ever *Filled*, *failed on-chain*, *expired* (certain nothing
+landed), or *sent — not confirmed yet* (check before retrying, so nothing fills
+twice).
 
 **An action surface.** Set your size: gross gap, swap fees per leg, price
 impact, amortised network cost, and what survives. Price impact is a **measured
@@ -139,7 +158,8 @@ Deploying: see **[DEPLOY.md](DEPLOY.md)** — Vercel via GitHub Actions (with a
 health smoke test that fails the job on an unhealthy deploy), or the Dockerfile
 for anywhere else. No environment variable is required to boot.
 
-No wallet, no RPC. For **live** prices set `PYTH_API_KEY` — Pyth began
+The board needs no wallet and no RPC. For trading, set `SOLANA_RPC_URL` to a
+dedicated Solana RPC (see `.env.example`). For **live** prices set `PYTH_API_KEY` — Pyth began
 requiring authentication on Hermes in August 2026, and without a key the board
 runs on labelled demo data instead (see [DEPLOY.md](DEPLOY.md)). **If it is unreachable — locked-down wifi, a corporate proxy, an offline
 demo machine — the app falls back to deterministic fixture data and says so in
@@ -264,9 +284,14 @@ sit at realistic levels rather than invented ones.
 ## Status
 
 The read and analysis path is complete: prices, sessions, basis, noise floor,
-history and costs. Quoting is built and tested against recorded responses but
-has not been run against live Jupiter from this machine. Kolu never builds,
-signs or sends a transaction, and holds no key material.
+history and costs. Quotes and swap transactions come from live Jupiter. Kolu
+builds the unsigned swap server-side, the user's wallet signs it, and the
+browser submits it; Kolu holds no key material and cannot sign anything.
+
+Wallet RPC goes through a same-origin relay (`/api/rpc`), because the public
+Solana endpoint refuses browser requests outright. It forwards only the methods
+the wallet flow needs. Set `SOLANA_RPC_URL` to a dedicated provider for
+production traffic; the public endpoint behind it is rate-limited.
 
 Kolu is analysis, not investment advice. Oracle prices are a mid, not a quote
 you can hit.

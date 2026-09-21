@@ -69,6 +69,8 @@ demonstrable, but on labelled demo data rather than live prices.
 | `KOLU_TOKEN_TICKER_TEMPLATE` | `{TICKER}X` | How a ticker becomes its tokenized ticker. |
 | `KOLU_BOARD_CACHE_MS` | `4000` | Snapshot cache window. `0` disables. |
 | `JUPITER_ENDPOINT` | `https://lite-api.jup.ag` | Router used for measured price impact. |
+| `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` | **Set this before a demo with wallets.** Upstream for the `/api/rpc` relay (balances, send, confirm). Server-side only, so a keyed provider URL (Alchemy, Helius, QuickNode) never reaches the browser. Tick **Preview** as well as Production on Vercel. `/api/health` → `execution.walletRpc` confirms it. |
+| `NEXT_PUBLIC_SOLANA_RPC` | _(none)_ | Lets the browser call a CORS-enabled RPC directly, bypassing the relay. Shipped to every visitor — never a paid key. |
 
 ### Why live prices need a key
 
