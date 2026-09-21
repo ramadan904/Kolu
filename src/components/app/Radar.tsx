@@ -23,6 +23,7 @@ import { MarketClock } from "./MarketClock";
 import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
 import { FirstVisit } from "./FirstVisit";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
@@ -335,6 +336,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       />
 
       <div className="mt-4" />
+      <ErrorBoundary name="Your position">
       <Portfolio
         readings={board.readings}
         mints={mints}
@@ -342,7 +344,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         onShowAll={tier === "all" ? undefined : () => setTier("all")}
         demo={demo !== null}
       />
+      </ErrorBoundary>
 
+      <ErrorBoundary name="The headline">
       <Hero
         reading={headline}
         hedgeable={hedgeable}
@@ -355,6 +359,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         onArmBreakeven={demo ? undefined : armBreakeven}
         onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
       />
+      </ErrorBoundary>
 
       <ArmedStrip
         rules={rules}
@@ -375,6 +380,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       )}
 
+      <ErrorBoundary name="The market map">
       <MarketMap
         readings={board.readings}
         onSelect={(t) => openTrade(t)}
@@ -382,6 +388,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         heldIn={watching ? "the watched address" : "your wallet"}
         selected={selected}
       />
+      </ErrorBoundary>
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
@@ -406,6 +413,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       </div>
 
+      <ErrorBoundary name="The pairs table">
       <AssetList
         readings={board.readings}
         hedgeable={hedgeable}
@@ -416,8 +424,28 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           setSelected((cur) => (cur === t ? null : t));
         }}
       />
+      </ErrorBoundary>
 
       {detail && (
+        <ErrorBoundary
+          name="The trade ticket"
+          fallback={() => (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" role="alertdialog">
+              <div className="panel max-w-sm p-5 text-[13px]">
+                <p className="text-[var(--text-2)]">
+                  The trade ticket hit an error. Nothing was signed or sent.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="mt-3 text-[var(--accent)] underline-offset-2 hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        >
         <TradeDrawer
           key={`${detail.ticker}:${tradeSide ?? "auto"}`}
           reading={detail}
@@ -434,6 +462,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           onRequestPermission={requestPermission}
           onClose={() => setSelected(null)}
         />
+        </ErrorBoundary>
       )}
     </div>
   );

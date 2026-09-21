@@ -91,46 +91,42 @@ asset, priced two ways, on one clock.
 
 ## Demo script (~2:30)
 
-**0:00 — The setup.** Open on the board, weekend. "Tokenized stocks trade around
-the clock. The companies they track don't. Right now NYSE has been shut for
-fourteen hours, and these five names have all drifted." Point at the session
-strip: *US equities: Weekend*. Point at the third tile: *Can it be hedged? No.*
+Works on any day. Most of the open session every pair is inside the noise floor
+— the replay covers that without passing anything off as live.
 
-**0:20 — The board.** "Widest dislocation is SPYX at +1.73%. The bar is
-diverging around zero — warm is a premium, cool is a discount, and AAPLX has
-gone the other way. The grey band around zero is the oracles' own confidence.
-Anything inside it we grey out, because it isn't signal."
+**0:00 — The setup.** Open the live board. "Tokenized stocks trade around the
+clock. The companies they track don't." Point at the session strip — open,
+after hours or closed — and the *Live* badge: both legs are live prices.
 
-**0:45 — The proof.** Click SPYX to open its trade ticket. Point at the chart. "This is the last 48
-hours. The shaded region is when the underlying market was shut. Look at the
-shape: flat through Friday's session — arbitrageurs can hedge, so they do — and
-then it opens the moment the market closes and keeps going all weekend. That's
-the whole thesis in one picture."
+**0:15 — The honest board.** "Every pair is measured against its real share.
+The grey band on the map is the oracles' own confidence; inside it is noise,
+and Kolu says *Hold* rather than invent a trade." If a real gap is open, it
+leads the page; if nothing pays, the hero says so and offers the replay.
 
-**1:10 — The honesty.** In the ticket: "173bps gross. Two legs of swap fees,
-measured price impact from a Jupiter route quote, network cost. 83bps left on a
-$10k clip." Point at *Net edge by size*: "and here's where it stops paying —
-live quotes at four sizes." Pause on the caveat. "The market is shut, so
-there's no short leg. This is a directional bet that it converges by the open —
-not an arbitrage. We never show that number in green."
+**0:35 — What acting looks like.** Click *See what Kolu does when a gap opens*.
+Amber banner: modelled, trading off, your position hidden. Open the ticket:
+"*Sell NVDAX · +130bps survives at $2k.* Net edge at four sizes from live
+Jupiter quotes — here's where it stops paying. The market is shut, so it's
+directional, not an arbitrage, and never shown in green." *Back to live prices.*
 
-**1:40 — Your position.** Close the ticket. Paste an exchange hot wallet into
-*Your position*. "Real holdings, read-only, no wallet needed — valued against
-the gaps. This row: if TSLAX converges to the real share, this position loses
-this much." Point at the rings on the map. "Connect your own wallet and Buy or
-Sell opens the ticket on that side; a fill shows up here without a reload."
+**1:10 — Prove the trade, without a wallet.** Open any live ticket, press *Dry
+run*. "That's the exact Jupiter transaction, built and simulated on mainnet —
+it delivers this many tokens right now. Nothing signed, nothing sent." The step
+tracker shows Quote → Build → Simulate → Sign (needs a wallet).
 
-**2:05 — Alerts and the failure mode.** Arm one on SPYX at 50bps. "It must
-*not* fire on a gap inside the noise floor, or on a stalled feed — one false
-alarm at 3am gets the whole feature muted." Point at the amber banner: "demo
-data, and it says so. It never passes modelled numbers off as live."
+**1:35 — Your position.** Click *see a live example*. "A public exchange wallet
+— sixteen million dollars of real xStocks, valued against the live gaps, with
+what each would gain or lose if its gap closed, and its latest xStock activity
+read from chain." Point at the rings on the map. "Connect your own wallet and
+Buy or Sell opens the ticket on that side; a fill lands here without a reload."
 
-**2:20 — The close.** "Four scenarios ship so you can summon a live
-dislocation, a calm market or a stalled feed on demand. Pyth gated live price
-updates behind a paid plan in August, so this is a modelled market and the page
-says so in three places — but symbol resolution is live, the mints are verified
-on chain, and one environment variable flips it. 170 tests. Clone it and it
-runs." Cut to the repo.
+**2:05 — Alerts.** On a quiet board: *Alert me when a gap pays* — every pair
+armed at the break-even gap for a $10k trade. "It never fires on noise or on a
+stalled feed; one false alarm at 3am gets the feature muted."
+
+**2:20 — The close.** "Live prices, live routes, verified mints, a swap that
+can't be reported as filled when it reverted. 185 tests. Every view is a link —
+this one opens the ticket." Copy link from the ticket; cut to the repo.
 
 ---
 
@@ -145,7 +141,7 @@ closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. A wallet trade flow — live Jupiter quote, wallet signature,
 polled confirmation that never reports a reverted swap as filled — and a
 positions view that values any Solana address's real xStock holdings against
-the live gaps. 170 tests. Falls back to labelled demo data when the live source
+the live gaps. 185 tests. Falls back to labelled demo data when the live source
 is unreachable.
 
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
@@ -157,17 +153,13 @@ change to the universe and on a weekday schedule. The tokenized twins are
 against mainnet — exact symbol match, mint account owned by Token-2022, and
 registry decimals equal to on-chain decimals.
 
-**Gated behind a paid subscription:** live price *updates*. Pyth began requiring
-authentication on 26 August 2026, and `/v2/updates/price/latest` now returns 401
-without a key; plans start at $500/month. Feed resolution still answers
-anonymously, which is why the board resolves every pair and then shows modelled
-prices rather than live ones.
-
-That split is visible in the product rather than hidden by it. `/api/health`
-reports `apiKeyConfigured`, the board carries a banner saying no number on the
-page is a market price, and alerts fired on demo data are prefixed `[demo]` so
-they cannot reach anyone as a live signal. Set `PYTH_API_KEY` and the same code
-path goes live with no other change.
+**Live prices:** both legs of every pair come from Jupiter's price service,
+with no key required — the deployed board shows *Live* and `/api/health` says
+`serving: jupiter`. Pyth remains the authenticated source: it began requiring a
+key for price *updates* on 26 August 2026 (plans from $500/month), so set
+`PYTH_API_KEY` to switch to it with no other change. If the live source is
+unreachable, the board falls back to labelled demo data — banner on screen,
+alerts prefixed `[demo]`, never passed off as live.
 
 **Verified against live Jupiter:** the trade path. All twelve pairs, both
 directions — quote fetched, parsed by the production adapter, sanity-checked,
@@ -188,6 +180,10 @@ so a leftover placeholder is dropped rather than handed to a router.
 
 ## Links
 
+- **Live:** https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app
+- **Straight to it:** [replay a dislocation](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?replay=1) ·
+  [a live portfolio](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?view=example) · [a TSLAX ticket](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?trade=TSLA)
+- **Health:** https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu
 - **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC for the board; set `SOLANA_RPC_URL` to trade
 
