@@ -116,6 +116,16 @@ export function computeEdge(input: EdgeInput): EdgeResult {
   };
 }
 
+/**
+ * The gross gap, in bps, a trade of this size needs just to break even under
+ * the default cost model — rounded up to a clean 5bps so it reads as a
+ * threshold someone would actually set.
+ */
+export function breakevenBps(notionalUsd = 10_000): number {
+  const { costBps } = computeEdge({ basisBps: 0, notionalUsd, hedgeable: true });
+  return Math.ceil(costBps / 5) * 5;
+}
+
 /** The side that captures a gap: sell a rich token, buy a cheap one. */
 export function sideForGap(basisBps: number | null): "buy" | "sell" {
   return (basisBps ?? 0) > 0 ? "sell" : "buy";

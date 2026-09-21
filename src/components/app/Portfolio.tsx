@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { BasisReading } from "@/lib/basis/compute";
-import { sideForGap } from "@/lib/basis/edge";
+import { computeEdge, sideForGap } from "@/lib/basis/edge";
+import { EXAMPLE_WALLET, knownLabel } from "@/lib/known-wallets";
 import type { MintMap, Side } from "./TradePanel";
 import { useBalances } from "./useBalances";
 import { fmtPct, fmtUsd } from "@/lib/format";
@@ -95,7 +96,16 @@ export function Portfolio({
             any address, read-only.
           </p>
         </div>
-        <WatchForm onWatch={watch} />
+        <div className="flex flex-col items-end gap-2">
+          <WatchForm onWatch={watch} />
+          <button
+            type="button"
+            onClick={() => watch(EXAMPLE_WALLET.address)}
+            className="text-[12px] text-[var(--accent)] underline-offset-2 hover:underline"
+          >
+            Or see a live example: the {EXAMPLE_WALLET.label}’s real xStocks →
+          </button>
+        </div>
       </div>
     );
   }
@@ -155,7 +165,7 @@ export function Portfolio({
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
           <div className={`${LABEL} flex items-center gap-2`}>
-            {watching ? "Watching" : "Your position"}
+            {watching ? (knownLabel(owner) ?? "Watching") : "Your position"}
             {watching && (
               <span className="rounded-full bg-[var(--raised)] px-1.5 text-[10px] normal-case tracking-normal text-[var(--text-2)]">
                 read-only
@@ -276,14 +286,22 @@ export function Portfolio({
           {holdings.map(({ reading: r, amount, value, convergence }) => {
             // Holding the rich side, selling captures the premium; holding the
             // cheap side, adding captures the discount. That action leads.
-            // Only when the gap is a signal — otherwise neither side captures anything.
-            const lead = !isSignal(r) || !r.basisBps ? null : sideForGap(r.basisBps);
             const muted = !isSignal(r);
+            const hint = actionHint(r, value, isSignal(r));
+            // Highlighted only when the hint says act: a real gap that also
+            // survives costs. Otherwise neither side captures anything.
+            const lead = hint.tone === "act" && r.basisBps ? sideForGap(r.basisBps) : null;
             return (
               <tr key={r.ticker} className="border-t border-[var(--border)]">
                 <td className="py-2.5">
                   <span className="font-medium">{r.tokenTicker}</span>
                   <span className="ml-2 text-[12px] text-[var(--text-3)]">{r.name}</span>
+                  <span
+                    className="mt-0.5 block text-[11px]"
+                    style={{ color: hint.tone === "act" ? "var(--down)" : "var(--text-3)" }}
+                  >
+                    {hint.text}
+                  </span>
                 </td>
                 <td className="num py-2.5 text-right">{fmtAmount(amount)}</td>
                 <td className="num py-2.5 text-right">{fmtUsd(value)}</td>
@@ -400,6 +418,35 @@ function WatchForm({ onWatch }: { onWatch: (address: string) => boolean }) {
       </span>
     </form>
   );
+}
+
+/**
+ * One line per holding saying what, if anything, to do about its gap — priced
+ * with the same cost model as the ticket, so the two never disagree. A rich
+ * holding is priced as selling the position; a cheap one as adding $10k.
+ */
+function actionHint(
+  r: BasisReading,
+  positionUsd: number,
+  signal: boolean,
+): { tone: "act" | "hold"; text: string } {
+  if (r.basisBps === null) return { tone: "hold", text: "No price" };
+  if (!signal) {
+    return {
+      tone: "hold",
+      text: r.signal === "degraded_feed" ? "Feed stalled · hold" : "In line with the real share · hold",
+    };
+  }
+  const selling = r.basisBps > 0;
+  const size = selling ? Math.max(positionUsd, 1) : 10_000;
+  const edge = computeEdge({ basisBps: r.basisBps, notionalUsd: size, hedgeable: true });
+  if (edge.netBps <= 0) return { tone: "hold", text: "Gap below costs · hold" };
+  return {
+    tone: "act",
+    text: selling
+      ? `Rich · selling captures ≈ ${signedUsd(edge.netUsd)} (est.)`
+      : `Cheap · adding $10k captures ≈ ${signedUsd(edge.netUsd)} (est.)`,
+  };
 }
 
 /** The deepest live discount — the gap a USDC holder can act on. */

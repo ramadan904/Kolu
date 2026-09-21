@@ -17,7 +17,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge, Dot } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
 import { fmtAmount } from "@/lib/tokens";
-import { describeTradeError, fromBaseUnits } from "@/lib/trade";
+import { describeTradeError, fromBaseUnits, jupiterOutAmount } from "@/lib/trade";
+import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 import { pollConfirmation } from "@/lib/confirm";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
@@ -55,7 +56,20 @@ type TxState =
   | { kind: "done"; signature: string; side: Side; spent: number; received: number | null }
   /** Sent, but the chain has not said either way. Must not be retried blindly. */
   | { kind: "unconfirmed"; signature: string }
-  | { kind: "error"; message: string; signature?: string };
+  | { kind: "error"; message: string; signature?: string; stage: Stage };
+
+/** Where a trade is in its life. Drives the step tracker and says where a failure happened. */
+type Stage = "quote" | "build" | "simulate" | "sign" | "confirm";
+
+/**
+ * A no-wallet dry run: the exact Jupiter transaction, built for a public funded
+ * wallet and simulated on mainnet. Nothing is signed or sent.
+ */
+type DryRun =
+  | { kind: "idle" }
+  | { kind: "running"; stage: "build" | "simulate" }
+  | { kind: "ok"; out: number | null; units: number | null }
+  | { kind: "failed"; message: string; stage: "quote" | "build" | "simulate" };
 
 export interface MintMap {
   quote: { mint: string; decimals: number } | null;
@@ -131,6 +145,7 @@ export function TradePanel({
   const [ladder, setLadder] = useState<Record<number, Quote>>({});
   const [tick, setTick] = useState(0);
   const [tx, setTx] = useState<TxState>({ kind: "idle" });
+  const [dry, setDry] = useState<DryRun>({ kind: "idle" });
 
   // Taking the wrong side of a gap only means something when the gap does.
   const against = gapIsSignal && hasGap && side !== gapSide;
@@ -166,6 +181,7 @@ export function TradePanel({
   // the USD notional, which moves with every price poll in token mode.
   useEffect(() => {
     setTx((t) => (t.kind === "done" || t.kind === "error" ? { kind: "idle" } : t));
+    setDry({ kind: "idle" });
   }, [side, input, unit, slippageBps]);
 
   // Quotes are directional. Showing a buy quote's output under a sell ticket
@@ -283,46 +299,82 @@ export function TradePanel({
     setUnit(next);
   };
 
+  // Never build against a quote the market has moved away from. Shared by the
+  // real swap and the dry run, so the dry run proves the path a trade takes.
+  const freshQuote = useCallback(async (): Promise<Quote> => {
+    if (quote?.available && quote.quote && Date.now() - quotedAt <= QUOTE_TTL_MS) return quote;
+    const live = await fetchQuote({ ticker: reading.ticker, notional, side, price: tokenPrice, slippageBps });
+    setQuote(live);
+    setQuotedAt(Date.now());
+    if (!live.available || !live.quote) throw new Error("No route");
+    return live;
+  }, [quote, quotedAt, reading.ticker, notional, side, tokenPrice, slippageBps]);
+
+  const buildSwap = useCallback(async (live: Quote, owner: string) => {
+    const res = await fetch("/api/swap", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quote: live.quote, userPublicKey: owner }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? `Swap build failed (${res.status})`);
+    return VersionedTransaction.deserialize(Buffer.from(body.swapTransaction as string, "base64"));
+  }, []);
+
+  /**
+   * Everything a trade does short of the signature, for real: fresh quote,
+   * the exact Jupiter transaction, simulated on mainnet. Built for a public
+   * funded wallet because simulation needs a payer that holds the input; it
+   * is never signed or sent, and the screen says whose wallet it simulated.
+   */
+  const dryRun = useCallback(async () => {
+    if (!sizeValid) return;
+    let stage: "quote" | "build" | "simulate" = "quote";
+    try {
+      setDry({ kind: "running", stage: "build" });
+      const live = await freshQuote();
+      stage = "build";
+      const transaction = await buildSwap(live, EXAMPLE_WALLET.address);
+      stage = "simulate";
+      setDry({ kind: "running", stage: "simulate" });
+      const sim = await connection.simulateTransaction(transaction, {
+        sigVerify: false,
+        replaceRecentBlockhash: true,
+        commitment: "confirmed",
+      });
+      if (sim.value.err) {
+        throw new Error(`Simulation failed: ${JSON.stringify(sim.value.err)} ${(sim.value.logs ?? []).slice(-3).join(" ")}`);
+      }
+      const raw = jupiterOutAmount(sim.value.logs, sim.value.returnData ?? null);
+      setDry({
+        kind: "ok",
+        out: raw !== null && live.outDecimals !== undefined ? Number(raw) / 10 ** live.outDecimals : null,
+        units: sim.value.unitsConsumed ?? null,
+      });
+    } catch (err) {
+      setDry({ kind: "failed", stage, message: describeTradeError(err, { slippageBps, payUnit }) });
+    }
+  }, [sizeValid, freshQuote, buildSwap, connection, slippageBps, payUnit]);
+
   const swap = useCallback(async () => {
     if (!publicKey || !signTransaction || !sizeValid) return;
     let signature: string | undefined;
+    let stage: Stage = "quote";
     const spent = side === "buy" ? notional : tokens;
     try {
       setTx({ kind: "building" });
-
-      // Never sign against a quote the market has moved away from.
-      let live = quote;
-      if (!live?.available || !live.quote || Date.now() - quotedAt > QUOTE_TTL_MS) {
-        live = await fetchQuote({
-          ticker: reading.ticker,
-          notional,
-          side,
-          price: tokenPrice,
-          slippageBps,
-        });
-        setQuote(live);
-        setQuotedAt(Date.now());
-        if (!live.available || !live.quote) throw new Error("No route");
-      }
-
-      const res = await fetch("/api/swap", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ quote: live.quote, userPublicKey: publicKey.toBase58() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? `Swap build failed (${res.status})`);
-
-      const transaction = VersionedTransaction.deserialize(
-        Buffer.from(body.swapTransaction as string, "base64"),
-      );
+      const live = await freshQuote();
+      stage = "build";
+      const transaction = await buildSwap(live, publicKey.toBase58());
       // Taken before signing: the expiry that matters is the one of the
       // blockhash baked into this transaction, not one fetched after sending.
       const { lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
+      stage = "sign";
       setTx({ kind: "signing" });
       const signed = await signTransaction(transaction);
 
+      stage = "confirm";
       setTx({ kind: "sending" });
       signature = await connection.sendRawTransaction(signed.serialize(), {
         maxRetries: 3,
@@ -356,7 +408,7 @@ export function TradePanel({
       });
       requestBalancesRefresh();
     } catch (err) {
-      setTx({ kind: "error", message: describeTradeError(err, { slippageBps, payUnit }), signature });
+      setTx({ kind: "error", message: describeTradeError(err, { slippageBps, payUnit }), signature, stage });
       // A failed swap still spends a fee; balances should say so.
       if (signature) requestBalancesRefresh();
     }
@@ -367,10 +419,8 @@ export function TradePanel({
     side,
     notional,
     tokens,
-    quote,
-    quotedAt,
-    reading.ticker,
-    tokenPrice,
+    freshQuote,
+    buildSwap,
     slippageBps,
     connection,
     payUnit,
@@ -404,9 +454,110 @@ export function TradePanel({
                 ? "Getting a quote"
                 : "Route unavailable";
 
+  const quoteStep: StepState = quote?.available
+    ? "done"
+    : quoting
+      ? "active"
+      : sizeValid && quote
+        ? "failed"
+        : "todo";
+  const walletOrder: Stage[] = ["quote", "build", "sign", "confirm"];
+  const txStage: Stage | null =
+    tx.kind === "building"
+      ? "build"
+      : tx.kind === "signing"
+        ? "sign"
+        : tx.kind === "sending" || tx.kind === "unconfirmed"
+          ? "confirm"
+          : tx.kind === "error"
+            ? tx.stage
+            : null;
+  const walletStep = (stage: Stage): StepState => {
+    if (tx.kind === "done") return "done";
+    if (!txStage) return stage === "quote" ? quoteStep : "todo";
+    const at = walletOrder.indexOf(txStage);
+    const here = walletOrder.indexOf(stage);
+    if (here < at) return "done";
+    if (here === at) return tx.kind === "error" ? "failed" : "active";
+    return "todo";
+  };
+  const dryStep = (stage: "build" | "simulate"): StepState => {
+    if (dry.kind === "ok") return "done";
+    if (dry.kind === "running") {
+      if (dry.stage === stage) return "active";
+      return stage === "build" ? "done" : "todo";
+    }
+    if (dry.kind === "failed") {
+      if (dry.stage === stage || (stage === "build" && dry.stage === "quote")) return "failed";
+      return stage === "build" && dry.stage === "simulate" ? "done" : "todo";
+    }
+    return "todo";
+  };
+  const steps: { label: string; state: StepState; hint?: string }[] = connected
+    ? [
+        { label: "Quote", state: walletStep("quote") },
+        { label: "Build", state: walletStep("build") },
+        { label: "Approve in wallet", state: walletStep("sign") },
+        { label: "Confirm", state: walletStep("confirm") },
+      ]
+    : [
+        { label: "Quote", state: quoteStep },
+        { label: "Build", state: dryStep("build") },
+        { label: "Simulate", state: dryStep("simulate") },
+        { label: "Sign", state: "locked", hint: "needs a wallet" },
+      ];
+
+  // The recommendation, stated first. Everything below it is the working.
+  const sizeLabel = fmtUsd(notional, notional >= 1000 ? 0 : 2);
+  const bestSize = SIZES.map((size) => {
+    const q = ladder[size];
+    const e = q?.available ? edgeAt(size, q.priceImpactBps ?? 0) : null;
+    return { size, net: e?.netBps ?? null };
+  })
+    .filter((c): c is { size: number; net: number } => c.net !== null && c.net > 0)
+    .sort((a, b) => b.net - a.net)[0];
+  const verdict: { tone: "good" | "caution" | "bad" | "neutral"; title: string; body: string } =
+    reading.basisBps === null || !reading.token || !reading.equity
+      ? { tone: "neutral", title: "No price to trade against", body: "One of the two feeds is missing." }
+      : !gapIsSignal
+        ? reading.signal === "degraded_feed"
+          ? {
+              tone: "neutral",
+              title: "Hold · the real-share feed has stalled",
+              body: "Kolu will not call a gap against a reference that stopped updating.",
+            }
+          : {
+              tone: "neutral",
+              title: "Hold · priced in line",
+              body: `The ${gapPct} gap is inside the oracles’ noise floor. Trading it only pays fees.`,
+            }
+        : against
+          ? {
+              tone: "caution",
+              title: `Exit only · ${side === "buy" ? "buying" : "selling"} pays the ${gapWord}`,
+              body: edge ? `Costs ${Math.round(-edge.netBps)}bps (${signedUsd(edge.netUsd)}) at ${sizeLabel}. Use it to close a position, not to trade the gap.` : "",
+            }
+          : edge && edge.netBps > 0
+            ? {
+                tone: edge.tone === "good" ? "good" : "caution",
+                title: `${side === "sell" ? "Sell" : "Buy"} ${reading.tokenTicker} · ${fmtBps(edge.netBps, 0)} survives at ${sizeLabel}`,
+                body: `≈ ${signedUsd(edge.netUsd)} after fees and measured impact.${hedgeable ? "" : " Directional: it pays only if the gap closes by the open."}`,
+              }
+            : {
+                tone: "bad",
+                title: `No trade at ${sizeLabel}`,
+                body: bestSize
+                  ? `Costs exceed the gap at this size, but ${bestSize.size >= 1000 ? `${bestSize.size / 1000}k` : bestSize.size} clears ${fmtBps(bestSize.net, 0)}.`
+                  : edge
+                    ? `Fees and impact outweigh the ${gapPct} ${gapWord} by ${Math.round(-edge.netBps)}bps at every size quoted.`
+                    : "Waiting for a quote.",
+              };
+
   return (
     <div>
       <div className="space-y-6">
+        <Verdict {...verdict} />
+
         {/* Side. The one that captures the gap is marked only when the board
             calls the gap a signal; the other side stays available for exits. */}
         <section>
@@ -429,7 +580,7 @@ export function TradePanel({
               </button>
             ))}
           </div>
-          {hasGap && reading.basisBps !== null && (
+          {hasGap && reading.basisBps !== null && gapIsSignal && (
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-3)]">
               {!gapIsSignal ? (
                 reading.signal === "degraded_feed" ? (
@@ -562,11 +713,11 @@ export function TradePanel({
           </div>
         </section>
 
-        <section>
+        <section className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
             Max slippage
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {SLIPPAGE_OPTIONS.map((bps) => (
               <button
                 key={bps}
@@ -586,10 +737,22 @@ export function TradePanel({
           </div>
         </section>
 
-        <section className="rounded-[var(--radius)] bg-[var(--raised)] p-4">
-          <div className="text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-            What survives at this size
-          </div>
+        {/* The working behind the verdict. Folded: the verdict and the pinned
+            bar carry the numbers that decide; this is for checking them. */}
+        <details className="group rounded-[var(--radius)] bg-[var(--raised)] px-4 py-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[13px] [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2 text-[var(--text-2)]">
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="transition-transform group-open:rotate-90">
+                <path d="M3 1.5L6.5 5 3 8.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              How the net edge is worked out
+            </span>
+            <span className="num text-[var(--text-3)]">
+              {edge
+                ? `${fmtBps(edge.grossBps, 0)} gap − ${Math.round(edge.costBps)}bps costs`
+                : "—"}
+            </span>
+          </summary>
           <dl className="mt-3 space-y-2 text-[13px]">
             <Line label={against ? "Gap (paid)" : "Gross gap"} value={edge ? fmtBps(edge.grossBps, 1) : "—"} />
             <Line label="Swap fees" value={edge ? `−${edge.breakdown[0].bps.toFixed(1)}bps` : "—"} muted />
@@ -636,7 +799,7 @@ export function TradePanel({
           <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-2)]">
             {edge?.caveat ?? "Enter a size to price this trade."}
           </p>
-        </section>
+        </details>
 
         {sizeValid && !quote?.available && !quoting && quote && (
           <p className="text-[12px] leading-relaxed text-[var(--text-3)]">{unquotedCopy(quote.reason)}</p>
@@ -715,6 +878,8 @@ export function TradePanel({
               </p>
             )}
 
+            <Steps steps={steps} />
+
             <div className="mb-3 flex items-end justify-between gap-4">
               <div className="num min-w-0 text-[13px] leading-snug text-[var(--text-2)]">
                 {sizeValid ? (
@@ -749,7 +914,44 @@ export function TradePanel({
             </div>
 
             {!connected ? (
-              <WalletButton size="lg" full dropUp label="Connect wallet to trade" />
+              <>
+                {dry.kind === "ok" && (
+                  <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--down)]/25 bg-[var(--down-soft)] px-3.5 py-2.5" role="status">
+                    <div className="text-[13px] font-medium text-[var(--down)]">Dry run passed on mainnet</div>
+                    <p className="num mt-0.5 text-[12px] leading-relaxed text-[var(--text-2)]">
+                      This exact Jupiter transaction executes right now
+                      {dry.out !== null ? (
+                        <>
+                          {" "}and delivers{" "}
+                          <span className="text-white">
+                            {fmtAmount(dry.out)} {receiveUnit}
+                          </span>
+                        </>
+                      ) : null}
+                      {dry.units ? ` · ${Math.round(dry.units / 1000)}k compute units` : ""}. Simulated
+                      from the {EXAMPLE_WALLET.label} (a public wallet) — nothing was signed or sent.
+                    </p>
+                  </div>
+                )}
+                {dry.kind === "failed" && (
+                  <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--up)]/25 bg-[var(--up-soft)] px-3.5 py-2.5" role="alert">
+                    <p className="text-[13px] leading-relaxed">Dry run stopped at {dry.stage}: {dry.message}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <WalletButton size="lg" full dropUp label="Connect wallet to trade" />
+                  <Button
+                    size="lg"
+                    variant="secondary"
+                    loading={dry.kind === "running"}
+                    disabled={!sizeValid || dry.kind === "running"}
+                    onClick={() => void dryRun()}
+                    title="Build the real transaction and simulate it on mainnet — nothing is signed or sent"
+                  >
+                    {dry.kind === "running" ? "Simulating" : dry.kind === "ok" ? "Run again" : "Dry run"}
+                  </Button>
+                </div>
+              </>
             ) : (
               <Button full size="lg" disabled={!canSwap} loading={busy} onClick={() => void swap()}>
                 {primaryLabel}
@@ -896,5 +1098,84 @@ function Line({
       </dt>
       <dd className={`num ${muted ? "text-[var(--text-2)]" : "text-white"}`}>{value}</dd>
     </div>
+  );
+}
+
+const VERDICT_COLOR = {
+  good: "var(--down)",
+  caution: "var(--warn)",
+  bad: "var(--up)",
+  neutral: "var(--text-3)",
+} as const;
+
+/** The answer first: what to do, in one line, and why in the next. */
+function Verdict({
+  tone,
+  title,
+  body,
+}: {
+  tone: keyof typeof VERDICT_COLOR;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div
+      className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--raised)] py-3 pr-4 pl-3.5"
+      style={{ boxShadow: `inset 3px 0 0 ${VERDICT_COLOR[tone]}` }}
+      role="status"
+    >
+      <div className="text-[15px] font-semibold tracking-[-0.01em]" style={{ color: tone === "neutral" ? "var(--text)" : VERDICT_COLOR[tone] }}>
+        {title}
+      </div>
+      {body && <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--text-2)]">{body}</p>}
+    </div>
+  );
+}
+
+type StepState = "done" | "active" | "todo" | "locked" | "failed";
+
+/**
+ * The whole path a trade takes, visible before anyone commits to it — so the
+ * ticket never looks like it ends at a button. A locked step says what it needs.
+ */
+function Steps({ steps }: { steps: { label: string; state: StepState; hint?: string }[] }) {
+  const dot: Record<StepState, string> = {
+    done: "var(--down)",
+    active: "var(--accent)",
+    todo: "var(--border-strong)",
+    locked: "var(--border-strong)",
+    failed: "var(--up)",
+  };
+  return (
+    <ol className="mb-3 flex items-center gap-1.5 text-[11px]" aria-label="Trade steps">
+      {steps.map((step, i) => (
+        <li key={step.label} className="flex min-w-0 items-center gap-1.5" title={step.hint}>
+          {i > 0 && <span className="h-px w-3 shrink-0 bg-[var(--border-strong)]" aria-hidden="true" />}
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${step.state === "active" ? "live-dot" : ""}`}
+            style={{ background: dot[step.state] }}
+            aria-hidden="true"
+          />
+          <span
+            className="whitespace-nowrap"
+            style={{
+              color:
+                step.state === "done"
+                  ? "var(--text-2)"
+                  : step.state === "active"
+                    ? "var(--text)"
+                    : step.state === "failed"
+                      ? "var(--up)"
+                      : "var(--text-3)",
+            }}
+          >
+            {step.label}
+            {step.state === "locked" && step.hint ? (
+              <span className="text-[var(--text-3)]"> · {step.hint}</span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

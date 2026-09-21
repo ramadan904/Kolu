@@ -130,8 +130,10 @@ export function TradeDrawer({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-          {reading.note && (
-            <p className="mb-5 text-[13px] leading-relaxed text-[var(--text-2)]">{reading.note}</p>
+          {/* The recommendation below already covers noise and stalled feeds;
+              only the closed-market context adds something it does not. */}
+          {reading.note && reading.signal === "stale_reference" && (
+            <p className="mb-3 text-[12px] leading-relaxed text-[var(--text-3)]">{reading.note}</p>
           )}
 
           <TradePanel

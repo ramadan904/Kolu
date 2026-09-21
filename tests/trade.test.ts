@@ -67,3 +67,46 @@ describe("computeEdge against the gap", () => {
     expect(sideForGap(null)).toBe("buy");
   });
 });
+
+describe("breakevenBps", () => {
+  it("is the round-trip cost of a $10k clip, rounded up to 5bps", async () => {
+    const { breakevenBps, computeEdge } = await import("../src/lib/basis/edge");
+    const cost = computeEdge({ basisBps: 0, notionalUsd: 10_000, hedgeable: true }).costBps;
+    const be = breakevenBps();
+    expect(be % 5).toBe(0);
+    expect(be).toBeGreaterThanOrEqual(cost);
+    expect(be - cost).toBeLessThan(5);
+  });
+});
+
+describe("decodeU64Base64", () => {
+  it("reads Jupiter's little-endian return amount", async () => {
+    const { decodeU64Base64 } = await import("../src/lib/trade");
+    // Captured from a mainnet simulation of a $2,000 USDC -> TSLAX swap.
+    expect(decodeU64Base64("l0nJHwAAAAA=")).toBe(533_285_271n);
+    expect(decodeU64Base64("8ngadwAAAAA=")).toBe(1_998_223_602n);
+  });
+  it("rejects missing or short data", async () => {
+    const { decodeU64Base64 } = await import("../src/lib/trade");
+    expect(decodeU64Base64(undefined)).toBeNull();
+    expect(decodeU64Base64("AAA=")).toBeNull();
+  });
+});
+
+describe("jupiterOutAmount", () => {
+  it("prefers Jupiter's own return log over a later program's returnData", async () => {
+    const { jupiterOutAmount } = await import("../src/lib/trade");
+    const logs = [
+      "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [1]",
+      "Program return: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 l0nJHwAAAAA=",
+      "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+    ];
+    const other = { programId: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", data: ["AQAAAAAAAAA=", "base64"] };
+    expect(jupiterOutAmount(logs, other)).toBe(533_285_271n);
+  });
+  it("ignores returnData from another program when there is no log line", async () => {
+    const { jupiterOutAmount } = await import("../src/lib/trade");
+    expect(jupiterOutAmount([], { programId: "Other", data: ["AQAAAAAAAAA=", "base64"] })).toBeNull();
+  });
+});

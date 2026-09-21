@@ -25,6 +25,7 @@ import { Portfolio } from "./Portfolio";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
+import { breakevenBps } from "@/lib/basis/edge";
 
 const POLL_MS = 10_000;
 
@@ -173,6 +174,22 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return out;
   }, [mints, balances]);
 
+  // One click from "nothing to trade" to "tell me when there is": an alert on
+  // every visible pair at the gap a $10k clip needs just to cover its costs.
+  const breakeven = breakevenBps();
+  const armedAtBreakeven = board.readings.filter((r) =>
+    rules.some((x) => x.ticker === r.ticker && x.thresholdBps === breakeven),
+  ).length;
+  const armBreakeven = useCallback(() => {
+    const have = new Set(
+      rulesRef.current.filter((x) => x.thresholdBps === breakeven).map((x) => x.ticker),
+    );
+    const add = board.readings
+      .filter((r) => !have.has(r.ticker))
+      .map((r) => makeRule(r.ticker, breakeven, "either"));
+    if (add.length > 0) commitRules([...rulesRef.current, ...add]);
+  }, [board.readings, breakeven, commitRules]);
+
   const openTrade = useCallback((ticker: string, side?: Side) => {
     setTradeSide(side);
     setSelected(ticker);
@@ -248,6 +265,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         session={board.session}
         delayed={delayed}
         onTrade={(t) => openTrade(t)}
+        breakevenBps={breakeven}
+        armedAtBreakeven={armedAtBreakeven}
+        pairs={board.readings.length}
+        onArmBreakeven={armBreakeven}
       />
 
       <ArmedStrip

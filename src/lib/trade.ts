@@ -62,3 +62,44 @@ export function fromBaseUnits(raw: string | undefined, decimals: number | undefi
   const units = Number(raw);
   return Number.isFinite(units) ? units / 10 ** decimals : null;
 }
+
+/**
+ * Jupiter's swap instruction returns the amount it delivered as a little-endian
+ * u64 in the transaction's return data. Reading it from a simulation gives the
+ * output the exact transaction would produce on mainnet right now — a stronger
+ * number than the quote it was built from.
+ */
+export function decodeU64Base64(b64: string | undefined | null): bigint | null {
+  if (!b64) return null;
+  let bin: string;
+  try {
+    bin = atob(b64);
+  } catch {
+    return null;
+  }
+  if (bin.length < 8) return null;
+  let value = 0n;
+  for (let i = 7; i >= 0; i -= 1) value = (value << 8n) | BigInt(bin.charCodeAt(i));
+  return value;
+}
+
+const JUPITER_V6 = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+
+/**
+ * The amount Jupiter delivered, from a simulation. Read from Jupiter's own
+ * "Program return" log line first: the transaction-level returnData holds
+ * whichever program returned last, and a route that ends by closing an account
+ * overwrites it. Falls back to returnData only when it is Jupiter's.
+ */
+export function jupiterOutAmount(
+  logs: string[] | null | undefined,
+  returnData?: { programId: string; data: [string, string] | string[] } | null,
+): bigint | null {
+  const prefix = `Program return: ${JUPITER_V6} `;
+  for (let i = (logs?.length ?? 0) - 1; i >= 0; i -= 1) {
+    const line = logs![i];
+    if (line.startsWith(prefix)) return decodeU64Base64(line.slice(prefix.length).trim());
+  }
+  if (returnData?.programId === JUPITER_V6) return decodeU64Base64(returnData.data?.[0]);
+  return null;
+}

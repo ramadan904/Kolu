@@ -19,6 +19,10 @@ export function Hero({
   session,
   delayed = 0,
   onTrade,
+  breakevenBps,
+  armedAtBreakeven = 0,
+  pairs = 0,
+  onArmBreakeven,
 }: {
   reading: BasisReading | null;
   hedgeable: boolean;
@@ -26,7 +30,34 @@ export function Hero({
   /** Pairs flagged `degraded_feed`: excluded from the headline, never "in line". */
   delayed?: number;
   onTrade: (ticker: string) => void;
+  /** Gross gap a $10k clip needs to cover costs — the level worth being told about. */
+  breakevenBps?: number;
+  armedAtBreakeven?: number;
+  pairs?: number;
+  onArmBreakeven?: () => void;
 }) {
+  // What a quiet board offers instead of a trade: be told when there is one.
+  const armAction =
+    onArmBreakeven && breakevenBps ? (
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        {pairs > 0 && armedAtBreakeven >= pairs ? (
+          <p className="text-[13px] text-[var(--down)]">
+            Watching all {pairs} pairs — you’ll be alerted when any gap passes {breakevenBps}bps,
+            the level a $10k trade needs to cover its costs.
+          </p>
+        ) : (
+          <>
+            <Button size="lg" onClick={onArmBreakeven}>
+              Alert me when a gap pays
+            </Button>
+            <span className="text-[13px] text-[var(--text-3)]">
+              Arms every pair at {breakevenBps}bps — where a $10k trade starts to clear fees and
+              impact.
+            </span>
+          </>
+        )}
+      </div>
+    ) : null;
   // A quiet board is the normal state while the market is open — arbitrageurs
   // are awake and the gaps are arbitraged away. Saying only "nothing here" is
   // accurate and useless; the screen should say why, and when to look again.
@@ -52,6 +83,7 @@ export function Hero({
               <span className="text-white">After-hours gaps open when the market closes, in {closesIn}.</span>
             )}
           </p>
+          {armAction}
         </section>
       );
     }
@@ -80,11 +112,11 @@ export function Hero({
           ) : (
             <>
               Nothing is currently trading far enough from its underlying to be worth
-              the fees. Gaps tend to open as the session ages — arm an alert on a name
-              below and Kolu will watch it for you.
+              the fees. Gaps tend to open as the session ages.
             </>
           )}
         </p>
+        {armAction}
       </section>
     );
   }
@@ -137,6 +169,9 @@ export function Hero({
           Trade {reading.tokenTicker}
         </Button>
       </div>
+      {/* The gap is real but does not pay yet: the useful next step is to be
+          told when it does, not to trade it now. */}
+      {edge.netBps <= 0 && armAction}
     </section>
   );
 }
