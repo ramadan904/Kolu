@@ -25,6 +25,7 @@ export function TradeDrawer({
   hedgeable,
   mints,
   initialSide,
+  demo = false,
   rules,
   permission,
   onAddRule,
@@ -38,6 +39,7 @@ export function TradeDrawer({
   hedgeable: boolean;
   mints: MintMap | null;
   initialSide?: Side;
+  demo?: boolean;
   rules: AlertRule[];
   permission: NotificationPermission | "unsupported";
   onAddRule: (ticker: string, thresholdBps: number, direction: AlertDirection) => void;
@@ -141,6 +143,7 @@ export function TradeDrawer({
             hedgeable={hedgeable}
             mints={mints}
             initialSide={initialSide}
+            demo={demo}
           >
             {history && (
               <div className="border-t border-[var(--border)] pt-6">

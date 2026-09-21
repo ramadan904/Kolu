@@ -35,12 +35,15 @@ export function Portfolio({
   mints,
   onTrade,
   onShowAll,
+  demo = false,
 }: {
   readings: BasisReading[];
   mints: MintMap | null;
   onTrade: (ticker: string, side: Side) => void;
   /** Widens the board to every tracked pair, so holdings outside the filter get priced. */
   onShowAll?: () => void;
+  /** A replayed scenario is on: real holdings are never valued at modelled prices. */
+  demo?: boolean;
 }) {
   const {
     balances,
@@ -83,6 +86,17 @@ export function Portfolio({
       .filter(([ticker, { mint }]) => !priced.has(ticker) && (balances.get(mint)?.amount ?? 0) > 0)
       .map(([ticker]) => `${ticker}X`);
   }, [readings, balances, mints]);
+
+  if (demo) {
+    return (
+      <div className="panel mb-5 px-4 py-3.5">
+        <div className={LABEL}>Your position</div>
+        <p className="mt-1 text-[13px] text-[var(--text-2)]">
+          Hidden during the replay — holdings are only ever valued at live prices.
+        </p>
+      </div>
+    );
+  }
 
   // Rendering nothing until a wallet connects means the section is invisible to
   // everyone evaluating the product. It states what it will show instead.

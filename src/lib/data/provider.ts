@@ -46,8 +46,8 @@ export function configuredScenario(): Scenario {
  * itself off wall-clock time will look like a dead feed to any caller running
  * on a different one.
  */
-export function makeFixtureSource(now?: () => Date): ResolvedSource {
-  const scenario = configuredScenario();
+export function makeFixtureSource(now?: () => Date, override?: Scenario): ResolvedSource {
+  const scenario = override ?? configuredScenario();
   return {
     source: new FixtureSource({ scenario, now }),
     mode: "fixture",

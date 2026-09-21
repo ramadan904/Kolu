@@ -23,18 +23,25 @@ Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
    diverges around zero: warm is a premium, cool is a discount. The grey band
    around zero is the two oracles' combined confidence — anything that fails to
    escape it is greyed out and labelled *Within noise*, because it is not signal.
+   **Quiet market?** Most of the open session is. Click *See what Kolu does
+   when a gap opens* to replay a modelled dislocation — labelled as demo on
+   every surface, with trading and your position switched off while it runs —
+   then *Back to live prices*.
 
-3. **Open the trade ticket** (Trade, or click any row or map tick). The side
-   that captures the gap is pre-selected — sell a rich token, buy a cheap one.
+3. **Open the trade ticket** (Trade, or click any row or map tick). It opens on
+   a verdict — *Sell NVDAX · +130bps survives at $2k*, *No trade at $2k*, or
+   *Hold · priced in line* — with the side that captures the gap pre-selected.
+   Without a wallet, press **Dry run**: the exact Jupiter transaction is built
+   and simulated on mainnet and reports what it delivers — nothing is signed.
    *Net edge by size* prices $500 / $2k / $10k / $50k from live Jupiter quotes,
    so you can see where the trade stops paying. The cost breakdown shows gross
    gap, fees, measured impact and what survives; on a closed market the caveat
    reads **Directional, not an arbitrage**. The chart below is the thesis:
    shaded = the underlying was shut, and the basis opens exactly then.
 
-4. **See a real portfolio without a wallet.** In *Your position*, paste any
-   Solana address — an exchange hot wallet from Solscan's TSLAx holders tab
-   works — and its actual xStock holdings are valued against the live gaps,
+4. **See a real portfolio without a wallet.** In *Your position*, click *see a
+   live example* (a public exchange wallet) or paste any Solana address, and its
+   actual xStock holdings are valued against the live gaps,
    read-only, with what each would gain or lose if its gap closed. Rings on the
    map and *Held* tags in the table show the same exposure.
 

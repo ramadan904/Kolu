@@ -111,6 +111,7 @@ export function TradePanel({
   hedgeable,
   mints,
   initialSide,
+  demo = false,
   children,
 }: {
   reading: BasisReading;
@@ -118,6 +119,8 @@ export function TradePanel({
   mints: MintMap | null;
   /** Set when the ticket is opened from a holding with an explicit Buy or Sell. */
   initialSide?: Side;
+  /** A replayed, modelled scenario: the ticket explains, but nothing can be sent or simulated. */
+  demo?: boolean;
   /**
    * Context rendered below the controls (chart, alerts). Passed in rather than
    * placed after the panel so the action bar stays pinned while it scrolls.
@@ -556,7 +559,10 @@ export function TradePanel({
   return (
     <div>
       <div className="space-y-6">
-        <Verdict {...verdict} />
+        <Verdict
+          {...verdict}
+          body={demo ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim() : verdict.body}
+        />
 
         {/* Side. The one that captures the gap is marked only when the board
             calls the gap a signal; the other side stays available for exits. */}
@@ -878,7 +884,7 @@ export function TradePanel({
               </p>
             )}
 
-            <Steps steps={steps} />
+            {!demo && <Steps steps={steps} />}
 
             <div className="mb-3 flex items-end justify-between gap-4">
               <div className="num min-w-0 text-[13px] leading-snug text-[var(--text-2)]">
@@ -913,7 +919,13 @@ export function TradePanel({
               </div>
             </div>
 
-            {!connected ? (
+            {demo ? (
+              <p className="rounded-[var(--radius-sm)] border border-[var(--warn)]/25 bg-[var(--warn-soft)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+                <span className="font-medium text-[var(--warn)]">Replay · trading is off.</span> The gap
+                here is modelled; quotes and costs are live. Go back to live prices to trade or
+                dry-run.
+              </p>
+            ) : !connected ? (
               <>
                 {dry.kind === "ok" && (
                   <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--down)]/25 bg-[var(--down-soft)] px-3.5 py-2.5" role="status">

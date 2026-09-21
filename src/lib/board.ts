@@ -49,6 +49,13 @@ export interface BoardSnapshot {
 export interface BoardOptions {
   tier?: "core" | "all";
   now?: Date;
+  /**
+   * Render a labelled demo scenario instead of live prices, on request. Lets
+   * someone see what a real dislocation looks like on a quiet day. The
+   * snapshot says `source: "fixture"` and carries the scenario, so every
+   * surface can label it — and it is never recorded into price history.
+   */
+  scenario?: Scenario;
 }
 
 /**
@@ -72,7 +79,7 @@ export async function buildBoard(options: BoardOptions = {}): Promise<BoardSnaps
   // An explicit clock means a caller wants a specific moment — tests, mostly.
   // Serving those from a cache keyed only by tier would be wrong.
   const cacheable = options.now === undefined && CACHE_TTL_MS > 0;
-  const key = options.tier ?? "core";
+  const key = `${options.tier ?? "core"}:${options.scenario ?? "live"}`;
 
   if (cacheable) {
     const hit = snapshots.get(key);
@@ -91,7 +98,9 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
   const session = getMarketSession(now);
 
   const clock = () => now;
-  let resolved = await resolveSource(clock);
+  let resolved = options.scenario
+    ? makeFixtureSource(clock, options.scenario)
+    : await resolveSource(clock);
   let prices: Map<string, PriceReading>;
   let fellBack = false;
   let fallbackReason: string | null = null;
@@ -128,8 +137,11 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
     ),
   );
 
-  for (const reading of readings) {
-    if (reading.basisBps !== null) record(reading.ticker, reading.basisBps, now);
+  // A requested demo must never become part of the recorded history.
+  if (!options.scenario) {
+    for (const reading of readings) {
+      if (reading.basisBps !== null) record(reading.ticker, reading.basisBps, now);
+    }
   }
 
   return {

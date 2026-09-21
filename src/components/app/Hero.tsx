@@ -23,6 +23,7 @@ export function Hero({
   armedAtBreakeven = 0,
   pairs = 0,
   onArmBreakeven,
+  onReplay,
 }: {
   reading: BasisReading | null;
   hedgeable: boolean;
@@ -35,7 +36,18 @@ export function Hero({
   armedAtBreakeven?: number;
   pairs?: number;
   onArmBreakeven?: () => void;
+  /** Replays a modelled dislocation, for a board with nothing to show. */
+  onReplay?: () => void;
 }) {
+  const replay = onReplay ? (
+    <button
+      type="button"
+      onClick={onReplay}
+      className="mt-4 text-[13px] text-[var(--accent)] underline-offset-2 hover:underline"
+    >
+      Quiet right now — see what Kolu does when a gap opens →
+    </button>
+  ) : null;
   // What a quiet board offers instead of a trade: be told when there is one.
   const armAction =
     onArmBreakeven && breakevenBps ? (
@@ -84,6 +96,7 @@ export function Hero({
             )}
           </p>
           {armAction}
+          {replay}
         </section>
       );
     }
@@ -117,6 +130,7 @@ export function Hero({
           )}
         </p>
         {armAction}
+        {replay}
       </section>
     );
   }

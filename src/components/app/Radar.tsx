@@ -26,12 +26,15 @@ import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
 import { breakevenBps } from "@/lib/basis/edge";
+import type { Scenario } from "@/lib/data/fixtures";
 
 const POLL_MS = 10_000;
 
 export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [board, setBoard] = useState(initial);
   const [tier, setTier] = useState<"core" | "all">("core");
+  // A replayed dislocation, requested from the page. Null = live prices.
+  const [demo, setDemo] = useState<Scenario | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Set only when a holding asks for a specific side; otherwise the ticket
   // opens on the side that captures the gap.
@@ -48,6 +51,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   // Mirrored in a ref because the poll callback reads the current rules, and
   // depending on the state would rebuild the interval on every rule change.
   const rulesRef = useRef<AlertRule[]>([]);
+  // Only the newest board request may land. Switching between live and a
+  // replayed scenario otherwise lets a slow response paint the wrong mode.
+  const requestSeq = useRef(0);
 
   const commitRules = useCallback((next: AlertRule[]) => {
     rulesRef.current = next;
@@ -114,12 +120,20 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
   const refresh = useCallback(
     async (which: "core" | "all") => {
+      const seq = ++requestSeq.current;
       try {
-        const res = await fetch(`/api/basis?tier=${which}`, { cache: "no-store" });
+        const res = await fetch(
+          `/api/basis?tier=${which}${demo ? `&scenario=${demo}` : ""}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) throw new Error(String(res.status));
         const snapshot: BoardSnapshot = await res.json();
+        if (seq !== requestSeq.current) return;
         setBoard(snapshot);
         setStale(false);
+        // A replayed scenario is modelled: it must never fire an alert or
+        // enter the browser's recorded history of real readings.
+        if (demo) return;
         applyRules(snapshot);
 
         // Recorded in the browser because a serverless process cannot hold
@@ -131,7 +145,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         setStale(true);
       }
     },
-    [applyRules],
+    [applyRules, demo],
   );
 
   useEffect(() => {
@@ -243,12 +257,28 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       )}
 
       {board.source === "fixture" && board.degraded !== "no_feeds" && (
-        <p className="mt-4 rounded-[var(--radius)] border border-[var(--warn)]/20 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] leading-relaxed text-[var(--text-2)]">
-          {board.fellBack
-            ? "The price feed is unreachable, so this is a modelled market."
-            : "Demo mode is switched on, so this is a modelled market."}{" "}
-          <span className="text-white">No number on this page is a real market price.</span>
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--warn)]/20 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] leading-relaxed text-[var(--text-2)]">
+          <p>
+            {demo
+              ? "Replaying a modelled dislocation, so you can see what Kolu does when a gap opens. Trading and your position are off while it runs."
+              : board.fellBack
+                ? "The price feed is unreachable, so this is a modelled market."
+                : "Demo mode is switched on, so this is a modelled market."}{" "}
+            <span className="text-white">No number on this page is a real market price.</span>
+          </p>
+          {demo && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null);
+                setDemo(null);
+              }}
+              className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--warn)]/40 px-3 py-1 text-[12px] font-medium text-[var(--warn)] transition-colors hover:bg-[var(--warn)]/10"
+            >
+              Back to live prices
+            </button>
+          )}
+        </div>
       )}
 
       <div className="mt-4" />
@@ -257,6 +287,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         mints={mints}
         onTrade={openTrade}
         onShowAll={tier === "all" ? undefined : () => setTier("all")}
+        demo={demo !== null}
       />
 
       <Hero
@@ -268,7 +299,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         breakevenBps={breakeven}
         armedAtBreakeven={armedAtBreakeven}
         pairs={board.readings.length}
-        onArmBreakeven={armBreakeven}
+        onArmBreakeven={demo ? undefined : armBreakeven}
+        onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
       />
 
       <ArmedStrip
@@ -341,6 +373,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           hedgeable={hedgeable}
           mints={mints}
           initialSide={tradeSide}
+          demo={demo !== null}
           rules={rules}
           permission={permission}
           onAddRule={addRule}
