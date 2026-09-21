@@ -18,6 +18,7 @@ import { Badge, Dot } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
 import { fmtAmount } from "@/lib/tokens";
 import { describeTradeError, fromBaseUnits } from "@/lib/trade";
+import { pollConfirmation } from "@/lib/confirm";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
 
@@ -52,6 +53,8 @@ type TxState =
   | { kind: "signing" }
   | { kind: "sending"; signature?: string }
   | { kind: "done"; signature: string; side: Side; spent: number; received: number | null }
+  /** Sent, but the chain has not said either way. Must not be retried blindly. */
+  | { kind: "unconfirmed"; signature: string }
   | { kind: "error"; message: string; signature?: string };
 
 export interface MintMap {
@@ -316,14 +319,21 @@ export function TradePanel({
       });
       setTx({ kind: "sending", signature });
 
-      const result = await connection.confirmTransaction(
-        { signature, blockhash: transaction.message.recentBlockhash, lastValidBlockHeight },
-        "confirmed",
-      );
+      const outcome = await pollConfirmation(connection, signature, lastValidBlockHeight);
       // A landed transaction can still have failed — slippage reverts on-chain.
       // Reporting that as "Filled" would be the worst lie this screen could tell.
-      if (result.value.err) {
-        throw new Error(`Transaction failed on-chain: ${JSON.stringify(result.value.err)}`);
+      if (outcome.status === "failed") {
+        throw new Error(`Transaction failed on-chain: ${JSON.stringify(outcome.err)}`);
+      }
+      if (outcome.status === "expired") {
+        throw new Error("Transaction expired: block height exceeded");
+      }
+      // The second-worst lie is "nothing was filled" about a swap that may yet
+      // land. Retrying it could buy twice, so this state has no retry button.
+      if (outcome.status === "unknown") {
+        setTx({ kind: "unconfirmed", signature });
+        requestBalancesRefresh();
+        return;
       }
 
       setTx({
@@ -647,6 +657,34 @@ export function TradePanel({
             tokenTicker={reading.tokenTicker}
             onReset={() => setTx({ kind: "idle" })}
           />
+        ) : tx.kind === "unconfirmed" ? (
+          <div
+            className="rounded-[var(--radius)] border border-[var(--warn)]/25 bg-[var(--warn-soft)] px-4 py-3.5"
+            role="status"
+          >
+            <div className="text-[14px] font-medium text-[var(--warn)]">Sent — not confirmed yet</div>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+              The swap was submitted but the network has not confirmed it either way. It may
+              still land. Check Solscan before trading again, or you could fill twice.
+            </p>
+            <div className="mt-2.5 flex gap-4 text-[12px]">
+              <a
+                className="text-white underline-offset-2 hover:underline"
+                href={`https://solscan.io/tx/${tx.signature}`}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                Check on Solscan
+              </a>
+              <button
+                type="button"
+                onClick={() => setTx({ kind: "idle" })}
+                className="text-[var(--text-2)] underline-offset-2 hover:text-white hover:underline"
+              >
+                I&rsquo;ve checked · new trade
+              </button>
+            </div>
+          </div>
         ) : !connected ? (
           <WalletButton size="lg" full label="Connect wallet to trade" />
         ) : (

@@ -63,12 +63,15 @@ export function MarketMap({
   readings,
   onSelect,
   held,
+  heldIn = "your wallet",
   selected = null,
 }: {
   readings: BasisReading[];
   onSelect: (ticker: string) => void;
   /** Tickers the connected wallet holds — ringed, so exposure reads on the map. */
   held?: ReadonlySet<string>;
+  /** Whose holdings the rings show, for the legend. */
+  heldIn?: string;
   selected?: string | null;
 }) {
   const priced = readings.filter((r) => r.basisBps !== null);
@@ -219,7 +222,7 @@ export function MarketMap({
                 style={{ background: "var(--text-2)", boxShadow: "0 0 0 2px var(--surface), 0 0 0 3.5px var(--text-2)" }}
                 aria-hidden="true"
               />
-              Ringed pairs are in your wallet.
+              Ringed pairs are in {heldIn}.
             </span>
           </>
         )}

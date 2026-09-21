@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { BasisReading } from "@/lib/basis/compute";
 import { sideForGap } from "@/lib/basis/edge";
 import type { MintMap, Side } from "./TradePanel";
@@ -34,13 +33,26 @@ export function Portfolio({
   readings,
   mints,
   onTrade,
+  onShowAll,
 }: {
   readings: BasisReading[];
   mints: MintMap | null;
   onTrade: (ticker: string, side: Side) => void;
+  /** Widens the board to every tracked pair, so holdings outside the filter get priced. */
+  onShowAll?: () => void;
 }) {
-  const { connected, publicKey } = useWallet();
-  const { balances, loading, refreshing, error, updatedAt, refresh } = useBalances();
+  const {
+    balances,
+    loading,
+    refreshing,
+    error,
+    updatedAt,
+    refresh,
+    owner,
+    watching,
+    watch,
+    stopWatching,
+  } = useBalances();
 
   const holdings = useMemo<Holding[]>(() => {
     if (!mints) return [];
@@ -61,18 +73,29 @@ export function Portfolio({
       .sort((a, b) => b.value - a.value);
   }, [readings, balances, mints]);
 
+  // Held xStocks the board is not currently pricing (the table is filtered to
+  // the liquid set). Leaving them out silently would understate the total.
+  const unpriced = useMemo(() => {
+    if (!mints) return [];
+    const priced = new Set(readings.map((r) => r.ticker));
+    return Object.entries(mints.tokens)
+      .filter(([ticker, { mint }]) => !priced.has(ticker) && (balances.get(mint)?.amount ?? 0) > 0)
+      .map(([ticker]) => `${ticker}X`);
+  }, [readings, balances, mints]);
+
   // Rendering nothing until a wallet connects means the section is invisible to
   // everyone evaluating the product. It states what it will show instead.
-  if (!connected || !publicKey) {
+  if (!owner) {
     return (
-      <div className="panel mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+      <div className="panel mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3.5">
         <div>
           <div className={LABEL}>Your position</div>
           <p className="mt-1 text-[13px] text-[var(--text-2)]">
-            Connect a wallet to value your xStocks against the live gaps below.
+            Connect a wallet to value your xStocks against the live gaps below — or view
+            any address, read-only.
           </p>
         </div>
-        <span className="text-[12px] text-[var(--text-3)]">Read-only · nothing is signed</span>
+        <WatchForm onWatch={watch} />
       </div>
     );
   }
@@ -82,7 +105,7 @@ export function Portfolio({
       <div className="panel mb-5 px-4 py-3.5" aria-busy="true">
         <div className="flex items-center gap-2.5 text-[13px] text-[var(--text-3)]">
           <Spinner />
-          Reading your wallet
+          {watching ? "Reading that address" : "Reading your wallet"}
         </div>
         <div className="mt-3 space-y-2">
           <div className="skeleton h-8" />
@@ -96,13 +119,24 @@ export function Portfolio({
     return (
       <div className="panel mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px]">
         <span className="text-[var(--text-2)]">{error}</span>
-        <button
-          type="button"
-          onClick={refresh}
-          className="text-[var(--text-2)] transition-colors hover:text-white"
-        >
-          Retry
-        </button>
+        <span className="flex gap-4">
+          <button
+            type="button"
+            onClick={refresh}
+            className="text-[var(--text-2)] transition-colors hover:text-white"
+          >
+            Retry
+          </button>
+          {watching && (
+            <button
+              type="button"
+              onClick={stopWatching}
+              className="text-[var(--text-3)] transition-colors hover:text-white"
+            >
+              Stop watching
+            </button>
+          )}
+        </span>
       </div>
     );
   }
@@ -110,13 +144,20 @@ export function Portfolio({
   const cash = mints?.quote ? (balances.get(mints.quote.mint)?.amount ?? 0) : 0;
   const invested = holdings.reduce((sum, h) => sum + h.value, 0);
   const exposure = holdings.reduce((sum, h) => sum + (h.convergence ?? 0), 0);
-  const address = publicKey.toBase58();
+  const address = owner;
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
-          <div className={LABEL}>Your position</div>
+          <div className={`${LABEL} flex items-center gap-2`}>
+            {watching ? "Watching" : "Your position"}
+            {watching && (
+              <span className="rounded-full bg-[var(--raised)] px-1.5 text-[10px] normal-case tracking-normal text-[var(--text-2)]">
+                read-only
+              </span>
+            )}
+          </div>
           <div className="display mt-1 text-[26px] leading-none">{fmtUsd(invested + cash)}</div>
         </div>
         <Stat label="xStocks" value={fmtUsd(invested)} />
@@ -149,6 +190,15 @@ export function Portfolio({
         >
           {address.slice(0, 4)}…{address.slice(-4)} ↗
         </a>
+        {watching && (
+          <button
+            type="button"
+            onClick={stopWatching}
+            className="transition-colors hover:text-white"
+          >
+            Stop
+          </button>
+        )}
       </div>
     </div>
   );
@@ -160,7 +210,23 @@ export function Portfolio({
         {header}
         <div className="hairline mt-3.5 flex flex-wrap items-center justify-between gap-3 pt-3.5">
           <p className="max-w-[560px] text-[13px] leading-relaxed text-[var(--text-2)]">
-            {cash <= 0 ? (
+            {unpriced.length > 0 ? (
+              <>
+                Holds <span className="text-white">{unpriced.join(", ")}</span>, outside the liquid
+                set the board is showing.{" "}
+                {onShowAll && (
+                  <button
+                    type="button"
+                    onClick={onShowAll}
+                    className="text-[var(--accent)] underline-offset-2 hover:underline"
+                  >
+                    Show all pairs to value {unpriced.length === 1 ? "it" : "them"}
+                  </button>
+                )}
+              </>
+            ) : watching ? (
+              "This address holds no tokenized stocks Kolu tracks. Try another, or connect your own wallet."
+            ) : cash <= 0 ? (
               "No xStocks or USDC in this wallet yet. Fund it with USDC on Solana to trade a gap."
             ) : entry && entry.basisBps !== null ? (
               <>
@@ -173,7 +239,7 @@ export function Portfolio({
               "No xStocks in this wallet yet. Nothing is trading below its real share right now — the table below updates live."
             )}
           </p>
-          {cash > 0 && entry && (
+          {!watching && unpriced.length === 0 && cash > 0 && entry && (
             <button
               type="button"
               onClick={() => onTrade(entry.ticker, "buy")}
@@ -247,10 +313,80 @@ export function Portfolio({
           })}
         </tbody>
       </table>
+      {unpriced.length > 0 && (
+        <p className="border-t border-[var(--border)] py-2 text-[12px] text-[var(--text-2)]">
+          Also holds <span className="text-white">{unpriced.join(", ")}</span>, not in the
+          liquid set and not counted above.{" "}
+          {onShowAll && (
+            <button
+              type="button"
+              onClick={onShowAll}
+              className="text-[var(--accent)] underline-offset-2 hover:underline"
+            >
+              Show all pairs to value {unpriced.length === 1 ? "it" : "them"}
+            </button>
+          )}
+        </p>
+      )}
       <p className="border-t border-[var(--border)] py-2 text-[11px] text-[var(--text-3)]">
-        Read-only · nothing is signed until you approve a trade in your wallet.
+        {watching
+          ? "Watching a public address · read-only, nothing can be signed for it. Connect your own wallet to trade."
+          : "Read-only · nothing is signed until you approve a trade in your wallet."}
       </p>
     </div>
+  );
+}
+
+/**
+ * Paste an address, see its real holdings. Lets anyone — a judge without
+ * xStocks, a trader checking a fund's wallet — see the portfolio working on
+ * live data without connecting anything.
+ */
+function WatchForm({ onWatch }: { onWatch: (address: string) => boolean }) {
+  const [value, setValue] = useState("");
+  const [invalid, setInvalid] = useState(false);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!value.trim()) return;
+    setInvalid(!onWatch(value));
+  };
+
+  return (
+    <form onSubmit={submit} className="flex w-full max-w-[420px] flex-col gap-1 sm:w-auto">
+      <div className="flex gap-1.5">
+        <input
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setInvalid(false);
+          }}
+          placeholder="Paste a Solana address"
+          aria-label="Solana address to view read-only"
+          aria-invalid={invalid}
+          spellCheck={false}
+          autoComplete="off"
+          className={`num h-8 min-w-0 flex-1 rounded-[var(--radius-sm)] border bg-[var(--bg)] px-2.5 text-[12px] outline-none sm:w-[300px] ${
+            invalid
+              ? "border-[var(--up)]"
+              : "border-[var(--border-strong)] focus:border-[var(--accent)]"
+          }`}
+        />
+        <button
+          type="submit"
+          className="h-8 shrink-0 rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-3 text-[12px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--raised)] hover:text-white"
+        >
+          View
+        </button>
+      </div>
+      <span className="text-[11px] text-[var(--text-3)]">
+        {invalid ? (
+          <span className="text-[var(--up)]">That is not a valid Solana address.</span>
+        ) : (
+          "Read-only · nothing is signed"
+        )}
+      </span>
+    </form>
   );
 }
 

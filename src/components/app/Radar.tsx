@@ -163,7 +163,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     };
   }, [selected]);
 
-  const { balances } = useBalances();
+  const { balances, watching } = useBalances();
   const held = useMemo(() => {
     const out = new Set<string>();
     if (!mints) return out;
@@ -234,7 +234,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </p>
       )}
 
-      <Portfolio readings={board.readings} mints={mints} onTrade={openTrade} />
+      <Portfolio
+        readings={board.readings}
+        mints={mints}
+        onTrade={openTrade}
+        onShowAll={tier === "all" ? undefined : () => setTier("all")}
+      />
 
       <Hero
         reading={headline}
@@ -267,6 +272,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         readings={board.readings}
         onSelect={(t) => openTrade(t)}
         held={held}
+        heldIn={watching ? "the watched address" : "your wallet"}
         selected={selected}
       />
 

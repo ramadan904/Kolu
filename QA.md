@@ -194,6 +194,25 @@ unlabelled.
 - [ ] Kill the RPC after the first read: the panel keeps the last read and
       marks it "Stale", rather than blanking.
 
+- [ ] **Watch any address.** With no wallet connected, paste a public address
+      (e.g. an exchange hot wallet from Solscan's holders tab) into Your
+      Position: it shows "Watching · read-only", real holdings and totals, and
+      "Stop" returns to the connect prompt. A malformed address is rejected
+      inline. Connecting a wallet always replaces the watched address.
+- [ ] **Holdings outside the filter are never silently dropped.** On "Liquid",
+      a wallet holding e.g. MSFTX shows "Also holds MSFTX…"; "Show all pairs"
+      switches the table to All and the row appears in the totals.
+
+### RPC relay
+
+- [ ] `POST /api/rpc` with `getHealth` returns `ok`; a method outside the
+      allowlist (e.g. `requestAirdrop`) returns 403. The public mainnet RPC
+      refuses browser requests, so every balance read and swap depends on this.
+- [ ] A swap is confirmed by polling, never by websocket. If confirmation
+      times out, the ticket says "Sent — not confirmed yet" with a Solscan
+      link and **no retry button** — it must never say "nothing was filled"
+      unless the blockhash has expired and the signature is absent.
+
 ### Board consistency
 
 - [ ] During regular hours with stalled references, the hero reads "No clean
