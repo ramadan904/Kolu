@@ -63,7 +63,7 @@ export function Hero({
           </p>
         ) : (
           <>
-            <Button size="lg" onClick={onArmBreakeven}>
+            <Button size="lg" variant="secondary" onClick={onArmBreakeven}>
               Alert me when a gap pays
             </Button>
             <span className="text-[13px] text-[var(--text-3)]">

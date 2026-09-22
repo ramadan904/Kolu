@@ -65,13 +65,39 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
-/** Deepest pool per mint; liquidity ranking changes slowly, so cache it long. */
+/**
+ * Deepest pool per xStock, as found on GeckoTerminal (liquidity in USD at the
+ * time). Liquidity ranking changes slowly, so a cold start uses these directly
+ * — one request per pair instead of two, which is what keeps a burst of
+ * visitors inside the free tier — and re-checks for a deeper pool hourly.
+ */
+export const KNOWN_POOLS: Record<string, string> = {
+  TSLA: "8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF", // ~$2.1M
+  NVDA: "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6", // ~$2.2M
+  SPY: "7a8xxAJBELDo6P9dikSYctdw6ce8F4mWr3ahcAD8Ao49", // ~$7.4M
+  AAPL: "CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y", // ~$0.35M
+  QQQ: "GMjGLWzvK75LPetrgAmdeXnvxc4fUuQPwJxeQqTDU1aG", // ~$2.3M
+  MSFT: "CLu4kFM4nb67xrdN7vJnMxXXir8Z5hA4HJUzPFccXjsL",
+  META: "3L7KbPVaAQA4UTecaGQYsm6UCq5F3sZM9zAYkxqYt63j",
+  AMZN: "6m5aXAve4uh6Kt4ytKyCLWNMjd8PYP5vujwNCtycrUiD",
+  GOOGL: "B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw",
+  COIN: "w7SGmPeXoMCsjvXqgsAmUn56uypyDsjAtsxeVkaiqxa",
+  MSTR: "2ngTuP7xA581dqX9uJkGRqxmKuehY3k4SDfPebeoRG2J",
+  CRCL: "GYqHjuDzTiw7i52Xv1qohDE6eJr6eSZpsrBVikGZyaFV",
+};
+
 const poolCache = new Map<string, { pool: string; at: number }>();
 const POOL_TTL_MS = 60 * 60_000;
 
-async function deepestPool(mint: string): Promise<string | null> {
+async function deepestPool(mint: string, ticker?: string): Promise<string | null> {
   const hit = poolCache.get(mint);
   if (hit && Date.now() - hit.at < POOL_TTL_MS) return hit.pool;
+  const known = ticker ? KNOWN_POOLS[ticker] : undefined;
+  if (known && !hit) {
+    // Seed the cache so the first hour runs on one request per pair.
+    poolCache.set(mint, { pool: known, at: Date.now() });
+    return known;
+  }
   const body = (await getJson(
     `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mint}/pools?page=1`,
   )) as { data?: { attributes?: { address?: string; reserve_in_usd?: string } }[] };
@@ -84,8 +110,8 @@ async function deepestPool(mint: string): Promise<string | null> {
   return pool;
 }
 
-export async function tokenBars(mint: string): Promise<PriceBar[]> {
-  const pool = await deepestPool(mint);
+export async function tokenBars(mint: string, ticker?: string): Promise<PriceBar[]> {
+  const pool = await deepestPool(mint, ticker).catch(() => (ticker ? (KNOWN_POOLS[ticker] ?? null) : null));
   if (!pool) return [];
   const body = (await getJson(
     `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=15&limit=200&currency=usd&token=${mint}`,
@@ -124,7 +150,7 @@ export async function realHistory(ticker: string, mint: string): Promise<History
   const hit = seriesCache.get(ticker);
   if (hit && Date.now() - hit.at < SERIES_TTL_MS) return hit.points;
   try {
-    const [token, equity] = await Promise.all([tokenBars(mint), equityBars(ticker)]);
+    const [token, equity] = await Promise.all([tokenBars(mint, ticker), equityBars(ticker)]);
     const cutoff = Date.now() - WINDOW_MS;
     const points = alignBasis(token, equity).filter((p) => p.t >= cutoff);
     // Too sparse to show a shape is not history; let the caller fall back.

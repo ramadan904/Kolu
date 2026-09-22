@@ -5,6 +5,9 @@
   "functions": {
     "src/app/api/**/route.ts": {
       "maxDuration": 15
+    },
+    "src/app/api/trigger/execute/route.ts": {
+      "maxDuration": 45
     }
   }
 }

@@ -14,7 +14,10 @@ const DESCRIPTION =
 
 // Link previews need absolute image URLs. The branch alias is stable across
 // redeploys, so a card shared yesterday still resolves today.
-const host = process.env.VERCEL_BRANCH_URL ?? process.env.VERCEL_URL;
+const host =
+  process.env.VERCEL_ENV === "production"
+    ? (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL)
+    : (process.env.VERCEL_BRANCH_URL ?? process.env.VERCEL_URL);
 
 export const metadata: Metadata = {
   metadataBase: new URL(host ? `https://${host}` : "http://localhost:3000"),

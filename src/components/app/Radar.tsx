@@ -24,6 +24,9 @@ import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
 import { FirstVisit } from "./FirstVisit";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { GapHistory } from "./GapHistory";
+import { RecentDislocations } from "./RecentDislocations";
+import { HowItReads } from "./HowItReads";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
@@ -39,6 +42,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [tier, setTier] = useState<"core" | "all">("core");
   // A replayed dislocation, requested from the page. Null = live prices.
   const [demo, setDemo] = useState<Scenario | null>(null);
+  // Pair shown in the on-page gap history; defaults to the headline pair.
+  const [chartTicker, setChartTicker] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Set only when a holding asks for a specific side; otherwise the ticket
   // opens on the side that captures the gap.
@@ -405,6 +410,16 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       />
       </ErrorBoundary>
 
+      <ErrorBoundary name="Gap history">
+        <GapHistory
+          readings={board.readings}
+          ticker={chartTicker ?? headline?.ticker ?? null}
+          onTicker={setChartTicker}
+          onTrade={(t) => openTrade(t)}
+          demo={demo !== null}
+        />
+      </ErrorBoundary>
+
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
           All tracked pairs
@@ -439,6 +454,22 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           setSelected((cur) => (cur === t ? null : t));
         }}
       />
+      </ErrorBoundary>
+
+      <div className="mt-5" />
+      {!demo && (
+        <ErrorBoundary name="Recent dislocations">
+          <RecentDislocations
+            onSelect={(t) => {
+              setChartTicker(t);
+              document.getElementById("gap-history")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          />
+        </ErrorBoundary>
+      )}
+
+      <ErrorBoundary name="How Kolu reads a gap">
+        <HowItReads readings={board.readings} session={board.session} hedgeable={hedgeable} />
       </ErrorBoundary>
 
       {detail && (

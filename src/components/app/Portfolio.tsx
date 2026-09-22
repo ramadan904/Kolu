@@ -13,6 +13,7 @@ import { fmtPct, fmtUsd } from "@/lib/format";
 import { fmtAmount } from "@/lib/tokens";
 import { convergenceUsd } from "@/lib/trade";
 import { Spinner } from "@/components/ui/Button";
+import { WalletButton } from "./WalletButton";
 
 interface Holding {
   reading: BasisReading;
@@ -125,20 +126,35 @@ export function Portfolio({
   // everyone evaluating the product. It states what it will show instead.
   if (!owner) {
     return (
-      <div className="panel mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3.5">
+      <div className="panel mb-5 grid gap-x-8 gap-y-5 px-4 py-4 sm:px-5 lg:grid-cols-[1fr_auto]">
         <div>
           <div className={LABEL}>Your position</div>
-          <p className="mt-1 text-[13px] text-[var(--text-2)]">
-            Connect a wallet to value your xStocks against the live gaps below — or view
-            any address, read-only.
+          <p className="mt-1 text-[15px] text-white">
+            Your xStocks, valued against the live gaps.
           </p>
+          <ul className="mt-3 grid gap-x-6 gap-y-2 text-[13px] text-[var(--text-2)] sm:grid-cols-3">
+            {[
+              ["Holdings vs the real share", "every xStock, its gap, and what closing it is worth"],
+              ["Limit orders at a gap", "open orders, how far each is from filling, cancel"],
+              ["Recent activity", "your latest xStock trades, read from chain"],
+            ].map(([title, body]) => (
+              <li key={title} className="flex gap-2">
+                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                <span>
+                  <span className="text-white">{title}</span>
+                  <span className="block text-[12px] text-[var(--text-3)]">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col gap-2 lg:w-[360px]">
+          <WalletButton size="lg" full label="Connect wallet" />
           <WatchForm onWatch={watch} />
           <button
             type="button"
             onClick={() => watch(EXAMPLE_WALLET.address)}
-            className="text-[12px] text-[var(--accent)] underline-offset-2 hover:underline"
+            className="self-start text-[12px] text-[var(--accent)] underline-offset-2 hover:underline"
           >
             Or see a live example: the {EXAMPLE_WALLET.label}’s real xStocks →
           </button>
@@ -311,6 +327,7 @@ export function Portfolio({
   return (
     <div className="panel mb-5 px-4 pt-3.5 pb-2 sm:px-5">
       {header}
+      <Allocation holdings={holdings} cash={cash} />
 
       {/* Phones: one card per holding — five numeric columns cannot share 390px. */}
       <ul className="mt-3.5 sm:hidden">
@@ -547,6 +564,51 @@ function actionHint(
       ? `Rich · selling captures ≈ ${signedUsd(edge.netUsd)} (est.)`
       : `Cheap · adding $10k captures ≈ ${signedUsd(edge.netUsd)} (est.)`,
   };
+}
+
+const SEGMENT_COLORS = ["#3d7bff", "#7aa2ff", "#1aa179", "#e8a33d", "#b88cff", "#5ec2d6"];
+
+/**
+ * Where the money is: one bar, each holding its share of the total, USDC
+ * last. A portfolio of twelve lines reads faster as a shape than as a list.
+ */
+function Allocation({ holdings, cash }: { holdings: Holding[]; cash: number }) {
+  const total = holdings.reduce((s, h) => s + h.value, 0) + cash;
+  if (!(total > 0)) return null;
+  const segments = [
+    ...holdings.map((h, i) => ({
+      label: h.reading.tokenTicker,
+      value: h.value,
+      color: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+    })),
+    ...(cash > 0 ? [{ label: "USDC", value: cash, color: "#2a2a31" }] : []),
+  ].filter((s) => s.value / total >= 0.002);
+  const top = holdings[0];
+  const invested = holdings.reduce((s, h) => s + h.value, 0);
+  return (
+    <div className="mt-3.5">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--raised)]" role="img" aria-label="Allocation by value">
+        {segments.map((s) => (
+          <span key={s.label} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} title={`${s.label} ${((s.value / total) * 100).toFixed(1)}%`} />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--text-3)]">
+        {segments.slice(0, 7).map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-[2px]" style={{ background: s.color }} aria-hidden="true" />
+            <span className="text-[var(--text-2)]">{s.label}</span>
+            <span className="num">{((s.value / total) * 100).toFixed(1)}%</span>
+          </span>
+        ))}
+        {top && invested > 0 && (
+          <span className="ml-auto">
+            Largest exposure: <span className="text-white">{top.reading.tokenTicker}</span>,{" "}
+            <span className="num">{((top.value / invested) * 100).toFixed(0)}%</span> of xStocks
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /**

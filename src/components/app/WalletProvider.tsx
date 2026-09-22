@@ -3,14 +3,16 @@
 import { useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import type { Adapter } from "@solana/wallet-adapter-base";
+import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BalancesProvider } from "./useBalances";
 
 /**
  * Wallet plumbing.
  *
- * No adapter list: Phantom, Solflare, Backpack and the rest register themselves
- * through the Wallet Standard, so hardcoding adapters only means shipping a
- * bundle of wallets the user does not have and missing the one they do.
+ * Almost no adapter list: Phantom, Solflare, Backpack and the rest register
+ * themselves through the Wallet Standard, so hardcoding adapters would ship a
+ * bundle of wallets the user does not have and miss the one they do. The single
+ * exception is Solflare's web wallet (below), which needs no extension.
  */
 export function SolanaProviders({ children }: { children: React.ReactNode }) {
   // The public mainnet endpoint refuses browser requests outright (403), so
@@ -35,7 +37,12 @@ export function SolanaProviders({ children }: { children: React.ReactNode }) {
     }),
     [],
   );
-  const wallets = useMemo<Adapter[]>(() => [], []);
+  // Phantom, Backpack and most others register themselves through the Wallet
+  // Standard, and on Android the provider adds the Mobile Wallet Adapter. The
+  // one adapter listed here is Solflare's, for its web wallet: it lets someone
+  // with no extension installed connect at all. With the extension present,
+  // the Standard wallet of the same name takes precedence.
+  const wallets = useMemo<Adapter[]>(() => [new SolflareWalletAdapter()], []);
 
   return (
     <ConnectionProvider endpoint={endpoint} config={config}>
