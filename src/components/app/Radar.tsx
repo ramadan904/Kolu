@@ -85,6 +85,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [tradeSide, setTradeSide] = useState<Side | undefined>(undefined);
   const [history, setHistory] = useState<HistorySeries | null>(null);
   const [stale, setStale] = useState(false);
+  // When the prices on screen were last confirmed live. While reconnecting,
+  // the board keeps showing them — it must also say how old they are.
+  const [freshAt, setFreshAt] = useState(() => Date.now());
+  const [, setAgeTick] = useState(0);
   const [mints, setMints] = useState<MintMap | null>(null);
   const [observed, setObserved] = useState<{ t: number; basisBps: number }[]>([]);
   const [fired, setFired] = useState<AlertHit[]>([]);
@@ -175,6 +179,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         if (seq !== requestSeq.current) return;
         setBoard(snapshot);
         setStale(false);
+        setFreshAt(Date.now());
         // A replayed scenario is modelled: it must never fire an alert or
         // enter the browser's recorded history of real readings.
         if (demo) return;
@@ -294,6 +299,12 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     setSelected(ticker);
   }, []);
 
+  useEffect(() => {
+    if (!stale) return;
+    const id = setInterval(() => setAgeTick((t) => t + 1), 1_000);
+    return () => clearInterval(id);
+  }, [stale]);
+
   const hedgeable = board.session.isRegularHours;
   const tradeable = board.readings.filter(
     (r) => r.signal === "actionable" || r.signal === "stale_reference",
@@ -405,7 +416,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
             // "Live" — the one thing this product must never do.
             <Badge tone="warn">{board.fellBack ? "Demo data" : "Demo mode"}</Badge>
           ) : stale ? (
-            <Badge tone="warn">Reconnecting</Badge>
+            <Badge tone="warn">Reconnecting · {ageLabel(Date.now() - freshAt)} old</Badge>
           ) : (
             <Badge tone="down">
               <Dot tone="down" live />
@@ -759,4 +770,13 @@ function Explore() {
       ))}
     </nav>
   );
+}
+
+/** "12s", "3m", "1h 4m" — how old the prices on screen are. */
+function ageLabel(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }

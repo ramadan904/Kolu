@@ -140,7 +140,7 @@ armed at the break-even gap for a $10k trade. "It never fires on noise or on a
 stalled feed; one false alarm at 3am gets the feature muted."
 
 **2:20 — The close.** "Live prices, live routes, verified mints, a swap that
-can't be reported as filled when it reverted. 218 tests. Every view is a link —
+can't be reported as filled when it reverted. 236 tests. Every view is a link —
 this one opens the ticket." Copy link from the ticket; cut to the repo.
 
 ---
@@ -166,7 +166,7 @@ closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. A wallet trade flow — live Jupiter quote, wallet signature,
 polled confirmation that never reports a reverted swap as filled — and a
 positions view that values any Solana address's real xStock holdings against
-the live gaps. 218 tests. Falls back to labelled demo data when the live source
+the live gaps. 236 tests. Falls back to labelled demo data when the live source
 is unreachable.
 
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
@@ -185,6 +185,14 @@ key for price *updates* on 26 August 2026 (plans from $500/month), so set
 `PYTH_API_KEY` to switch to it with no other change. If the live source is
 unreachable, the board falls back to labelled demo data — banner on screen,
 alerts prefixed `[demo]`, never passed off as live.
+
+**Resilient by default:** the wallet relay keeps a second keyless Solana
+endpoint behind whatever `SOLANA_RPC_URL` names and moves on when one
+throttles or fails, so a rate limit costs a few hundred milliseconds rather
+than a balance read or a swap. The response carries `x-kolu-rpc` naming which
+endpoint answered, and `/api/health` lists the chain. When a price poll fails
+the board keeps the last prices and says how old they are — "Reconnecting ·
+44s old" — instead of blanking or pretending they are live.
 
 **Verified against live Jupiter:** the trade path. All twelve pairs, both
 directions — quote fetched, parsed by the production adapter, sanity-checked,
