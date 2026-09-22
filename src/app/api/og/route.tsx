@@ -15,15 +15,17 @@ export const dynamic = "force-dynamic";
  */
 
 const C = {
-  bg: "#08080a",
-  surface: "#0e0e11",
+  bg: "#05060a",
+  surface: "#0a0b10",
   border: "rgba(255,255,255,0.10)",
   text: "#ffffff",
-  text2: "#90909a",
-  text3: "#5c5c66",
-  down: "#1aa179",
-  up: "#ef4444",
-  warn: "#e8a33d",
+  text2: "#9699a6",
+  text3: "#5d6070",
+  accent: "#3b82ff",
+  accent2: "#2ee6ff",
+  down: "#19d18f",
+  up: "#ff4d6a",
+  warn: "#f0ad45",
 };
 
 function usd(v: number) {
@@ -75,12 +77,44 @@ export async function GET(request: Request) {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: C.bg,
-          padding: "64px 72px",
+          backgroundColor: C.bg,
+          padding: "58px 72px",
           color: C.text,
           fontFamily: "sans-serif",
+          position: "relative",
         }}
       >
+        {/* The room's light, as elements: satori renders one gradient per node. */}
+        <div
+          style={{
+            position: "absolute",
+            top: -260,
+            left: 100,
+            width: 1000,
+            height: 620,
+            backgroundImage: "radial-gradient(circle, rgba(59,130,255,0.42), rgba(59,130,255,0) 70%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: -120,
+            right: -140,
+            width: 560,
+            height: 460,
+            backgroundImage: "radial-gradient(circle, rgba(46,230,255,0.16), rgba(46,230,255,0) 70%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: -180,
+            left: -120,
+            width: 520,
+            height: 420,
+            backgroundImage: "radial-gradient(circle, rgba(25,209,143,0.12), rgba(25,209,143,0) 70%)",
+          }}
+        />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", width: 40, height: 40, borderRadius: 10, background: "#16161a", position: "relative" }}>
@@ -90,9 +124,14 @@ export async function GET(request: Request) {
             </div>
             <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.5 }}>Kolu</div>
           </div>
-          {demo && (
+          {demo ? (
             <div style={{ display: "flex", fontSize: 22, color: C.warn, border: `2px solid ${C.warn}`, borderRadius: 999, padding: "6px 18px" }}>
               DEMO DATA
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 21, color: C.text2, border: `1px solid ${C.border}`, borderRadius: 999, padding: "7px 20px", backgroundColor: "rgba(255,255,255,0.04)" }}>
+              <div style={{ display: "flex", width: 9, height: 9, borderRadius: 999, backgroundColor: C.down }} />
+              LIVE · 12 pairs, both legs
             </div>
           )}
         </div>
@@ -105,28 +144,37 @@ export async function GET(request: Request) {
                 {s!.text}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 32, marginTop: 8 }}>
-              <div style={{ fontSize: 132, fontWeight: 700, letterSpacing: -4 }}>{reading.tokenTicker}</div>
-              <div style={{ fontSize: 96, fontWeight: 700, letterSpacing: -3, color: gapColor }}>{pct(reading.basisBps)}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 34, marginTop: 6 }}>
+              <div style={{ fontSize: 140, fontWeight: 800, letterSpacing: -6 }}>{reading.tokenTicker}</div>
+              <div style={{ fontSize: 104, fontWeight: 800, letterSpacing: -4, color: gapColor }}>{pct(reading.basisBps)}</div>
             </div>
-            <div style={{ display: "flex", gap: 40, fontSize: 32, color: C.text2, marginTop: 8 }}>
-              <div style={{ display: "flex" }}>
-                Token&nbsp;<span style={{ color: C.text }}>{usd(reading.token.price)}</span>
+            {/* The gap as a distance, the way the hero draws it. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 20, color: C.text3, letterSpacing: 1 }}>TOKEN</div>
+                <div style={{ fontSize: 38, fontWeight: 600 }}>{usd(reading.token.price)}</div>
               </div>
-              <div style={{ display: "flex" }}>
-                Real share&nbsp;<span style={{ color: C.text }}>{usd(reading.equity.price)}</span>
+              <div style={{ display: "flex", width: 190, height: 8, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.07)", marginTop: 22, position: "relative" }}>
+                <div style={{ position: "absolute", left: 12, right: 12, top: 0, height: 8, borderRadius: 999, backgroundColor: gapColor }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 20, color: C.text3, letterSpacing: 1 }}>REAL SHARE</div>
+                <div style={{ fontSize: 38, fontWeight: 600 }}>{usd(reading.equity.price)}</div>
+              </div>
+              <div style={{ display: "flex", marginTop: 26, fontSize: 24, color: C.text2 }}>
+                {usd(Math.abs(reading.token.price - reading.equity.price))} apart
               </div>
             </div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 84, fontWeight: 700, letterSpacing: -2 }}>Fair value for</div>
-            <div style={{ fontSize: 84, fontWeight: 700, letterSpacing: -2 }}>tokenized stocks</div>
+            <div style={{ fontSize: 92, fontWeight: 800, letterSpacing: -3 }}>Fair value for</div>
+            <div style={{ fontSize: 92, fontWeight: 800, letterSpacing: -3, color: C.accent2 }}>tokenized stocks</div>
             {summary && <div style={{ display: "flex", fontSize: 32, color: C.text2, marginTop: 20 }}>{summary}</div>}
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 24, color: C.text3 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 24, color: C.text3, borderTop: `1px solid ${C.border}`, paddingTop: 22 }}>
           <div>Is the token trading away from the real share — and does the gap pay after costs?</div>
         </div>
       </div>
