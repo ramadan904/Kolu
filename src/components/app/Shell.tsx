@@ -87,7 +87,7 @@ export function Shell({
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
           <p className="border-t border-[var(--border)] pt-5 text-[11px] leading-relaxed text-[var(--text-3)]">
-            Prices are oracle mid, not a quote you can hit; the ticket prices trades from live
+            Prices are mid, not a quote you can hit; the ticket prices trades from live
             Jupiter quotes. Kolu never holds keys — every trade and order is signed in your wallet.
             Kolu is analysis, not investment advice.
           </p>

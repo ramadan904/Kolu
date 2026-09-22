@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { ASSUMED_BAND_BPS } from "@/lib/basis/band";
+import { NOISE_MULTIPLE } from "@/lib/basis/compute";
 import { buildBoard } from "@/lib/board";
 import { configuredMode, configuredScenario, hasPythApiKey } from "@/lib/data/provider";
 import { executionReady, loadMints } from "@/lib/mints";
@@ -94,6 +96,15 @@ export async function GET() {
       },
       // The naming that cannot be verified without calling Hermes, echoed back
       // so a mismatch is diagnosable from the deployment itself.
+      // What the grey band on the board actually is. Jupiter publishes no
+      // confidence interval, so on this deployment the band is Kolu's own
+      // assumption — stated here rather than implied to be an oracle's.
+      noiseFloor: {
+        basis: board?.source === "pyth" ? "published confidence" : "assumed",
+        perLegBps: board?.source === "pyth" ? null : ASSUMED_BAND_BPS,
+        multiple: NOISE_MULTIPLE,
+        switchWith: board?.source === "pyth" ? null : "PYTH_API_KEY",
+      },
       symbolTemplates: {
         equity: process.env.KOLU_EQUITY_SYMBOL_TEMPLATE ?? DEFAULT_EQUITY_TEMPLATE,
         token: process.env.KOLU_TOKEN_SYMBOL_TEMPLATE ?? DEFAULT_TOKEN_TEMPLATE,

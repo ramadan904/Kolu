@@ -1,5 +1,6 @@
 "use client";
 
+import { bandCopy, type PriceSourceKind } from "@/lib/basis/band";
 import { NOISE_MULTIPLE, type BasisReading } from "@/lib/basis/compute";
 import { breakevenBps, computeEdge } from "@/lib/basis/edge";
 import type { MarketSession } from "@/lib/market/session";
@@ -13,10 +14,13 @@ export function HowItReads({
   readings,
   session,
   hedgeable,
+  source = "jupiter",
 }: {
   readings: BasisReading[];
   session: MarketSession;
   hedgeable: boolean;
+  /** Which price source is serving: it decides what the noise floor is. */
+  source?: PriceSourceKind;
 }) {
   const floors = readings
     .map((r) => r.confidenceBps)
@@ -42,7 +46,7 @@ export function HowItReads({
       title: "Is the gap real?",
       value: noise !== null ? `±${noise.toFixed(1)}bps` : "—",
       caption: "noise floor now",
-      body: `Both prices carry a confidence band. A gap inside ${NOISE_MULTIPLE}× their combined width is two error bars overlapping, not a dislocation. ${signals} of ${readings.length} pairs are outside it right now.`,
+      body: `${bandCopy(source).long} ${signals} of ${readings.length} pairs are outside it right now.`,
     },
     {
       n: 2,

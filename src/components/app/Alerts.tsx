@@ -112,7 +112,7 @@ export function AlertControl({
       )}
 
       <p className="mt-3 max-w-md text-[12px] leading-relaxed text-[var(--text-3)]">
-        Alerts never fire on a gap inside the oracles&rsquo; confidence band, or on one
+        Alerts never fire on a gap inside the noise floor, or on one
         measured against a feed that has stopped ticking. A false alarm at 3am costs
         more than a missed one.
       </p>

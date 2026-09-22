@@ -22,16 +22,19 @@ Tokenized stocks trade 24/7. The companies they track do not. For about 118 of
 the 168 hours in a week, an xStock is priced by a market with no reference to
 check itself against — and it drifts.
 
-Kolu measures that drift. It puts Pyth's equity feed for the real share
-(`Equity.US.AAPL/USD`) next to Pyth's feed for the token (`Crypto.AAPLX/USD`),
-ranks every pair by how far apart they are, and then does the three things that
-turn a number into a decision:
+Kolu measures that drift. It prices both legs of every pair — the real share and
+its token — on one clock, ranks them by how far apart they are, and then does
+the three things that turn a number into a decision. (The deployed board serves
+both legs from Jupiter, which needs no key; the Pyth adapter ships and takes
+over when `PYTH_API_KEY` is set. `/api/health` always says which is serving.)
 
-**It tells you whether the gap is real.** Pyth publishes a confidence interval
-with every price. Add both legs' bands and you get a noise floor. A 60bps
-"dislocation" between two feeds each carrying a 25bps band is not a trade, it is
-two error bars overlapping — so Kolu draws that band on the chart and greys out
-anything that fails to escape it.
+**It tells you whether the gap is real.** Every gap is measured against a noise
+floor and anything inside it is greyed out as noise, not a trade — two error
+bars overlapping is not a dislocation. Where that floor comes from is stated
+rather than implied: with Pyth serving it is the confidence interval published
+with each price; on the deployed board, where Jupiter serves and publishes no
+interval, it is Kolu's own assumption of ±6bps a leg, said in those words on the
+board, in *How Kolu reads a gap*, and in `/api/health` (`noiseFloor.basis`).
 
 **It tells you whether the gap is opening or closing.** The 48h chart shades the
 periods when the underlying market was shut, and it is drawn from real trades:
@@ -73,12 +76,18 @@ Take any of those three away and the product is impossible.
 
 ## Pyth track
 
-Kolu's core operation is a comparison that only Pyth makes possible: the same
-asset, priced two ways, on one clock.
+Kolu's core operation is a comparison Pyth is built for: the same asset, priced
+two ways, on one clock. The integration ships and is verified in CI; the
+deployed board serves Jupiter prices because Pyth began charging for price
+updates in August 2026 (plans from $500/month) and this submission has no key.
+Set `PYTH_API_KEY` and the same board runs on Pyth with no other change —
+`/api/health` will show `serving: pyth` and `noiseFloor.basis: published
+confidence`.
 
 - Uses **both** the US equity feeds and the tokenized-equity crypto feeds.
 - Uses the **confidence interval**, not just the price — it is what separates a
-  signal from two overlapping error bars, and it is drawn on the chart.
+  signal from two overlapping error bars, and it is drawn on the chart. Without
+  a key the band is a labelled assumption, never passed off as an oracle's.
 - Uses **publish time** to distinguish a reference that is stale because the
   market is shut from one that is stale because the feed has stalled. These are
   reported as different conditions because a trader responds to each
@@ -139,6 +148,16 @@ this one opens the ticket." Copy link from the ticket; cut to the repo.
 ## What is real, and what is not
 
 Judges can check every line of this.
+
+**Four pages, one live board.** *Board* (the market now), *Portfolio* (holdings,
+P&L, orders, activity), *History* (a week of real gaps, and whether they closed
+at the open) and *Backtest* (would trading them have paid). Prices, an open
+ticket, the replay and a watched address carry across all four; ⌘K reaches
+everything.
+
+**Pay in USDC or SOL.** The ticket trades either side of the pair against USDC
+or native SOL, so a wallet holding only SOL can trade; it keeps back only what
+the fees need and states the token account's one-time rent before a first buy.
 
 **Working:** market session engine (DST, half-day closes, holiday calendar),
 Pyth Hermes adapter with runtime feed resolution, basis computation with the

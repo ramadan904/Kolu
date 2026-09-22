@@ -272,3 +272,20 @@ describe("worstCase", () => {
     expect(worstCase(60, -10).worstNetBps).toBe(60);
   });
 });
+
+describe("bandCopy", () => {
+  it("calls the band an assumption when the serving source publishes none", async () => {
+    const { bandCopy, ASSUMED_BAND_BPS } = await import("@/lib/basis/band");
+    expect(ASSUMED_BAND_BPS).toBe(6);
+    const jup = bandCopy("jupiter");
+    expect(jup.short).toContain("assumed");
+    expect(jup.long).toContain("PYTH_API_KEY");
+    expect(jup.short).not.toMatch(/own confidence/);
+  });
+
+  it("calls it the feeds' own confidence only when Pyth is serving", async () => {
+    const { bandCopy } = await import("@/lib/basis/band");
+    expect(bandCopy("pyth").short).toMatch(/own confidence/);
+    expect(bandCopy("pyth").long).toMatch(/publish a confidence interval/);
+  });
+});

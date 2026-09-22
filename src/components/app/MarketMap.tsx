@@ -2,6 +2,7 @@
 
 import { NOISE_MULTIPLE, type BasisReading } from "@/lib/basis/compute";
 import { fmtPct } from "@/lib/format";
+import { bandCopy, type PriceSourceKind } from "@/lib/basis/band";
 
 /**
  * Every tracked pair on one basis axis.
@@ -66,6 +67,7 @@ function place(readings: BasisReading[], domain: number): Placed[] {
 }
 
 export function MarketMap({
+  source = "jupiter",
   readings,
   onSelect,
   held,
@@ -73,6 +75,8 @@ export function MarketMap({
   selected = null,
 }: {
   readings: BasisReading[];
+  /** Which price source is serving: the noise band means different things. */
+  source?: PriceSourceKind;
   onSelect: (ticker: string) => void;
   /** Tickers the connected wallet holds — ringed, so exposure reads on the map. */
   held?: ReadonlySet<string>;
@@ -244,8 +248,8 @@ export function MarketMap({
 
       <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-3)]">
         Left of centre trades below the real share; right of centre trades above it.
-        The shaded middle is the feeds&rsquo; own confidence — anything inside it is
-        noise, not a dislocation.
+        The shaded middle is {bandCopy(source).short} — anything inside it is noise, not a
+        dislocation.
         {held && held.size > 0 && (
           <>
             {" "}

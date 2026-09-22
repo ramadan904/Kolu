@@ -32,6 +32,16 @@ unlabelled.
 
 ## 1. Live path & data integrity
 
+> **Which serving mode are you in?** `/api/health` → `source.serving`. The
+> deployed board serves `jupiter` (no key needed), and then the four Hermes
+> items below — request counts, negative cache, snapshot cache, exact symbol
+> matching — are **N/A**: they test the Pyth path, which only runs with
+> `PYTH_API_KEY` set. Symbol naming is covered by CI (Verify Pyth feeds) instead.
+> In Jupiter mode check these instead: `npm run verify-board` prices 12/12 pairs,
+> and `/api/health` → `noiseFloor.basis` reads `assumed` with `perLegBps: 6`
+> (the board and *How Kolu reads a gap* must say "assumed", never "the feeds'
+> own confidence").
+
 - [ ] **Cold start does not spam the oracle.** Restart the server, load the
       board once, and count outbound requests (server logs, or Vercel function
       logs). A cold start of the 12-name universe should issue roughly **one

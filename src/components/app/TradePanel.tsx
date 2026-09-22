@@ -610,7 +610,7 @@ export function TradePanel({
           : {
               tone: "neutral",
               title: "Hold · priced in line",
-              body: `The ${gapPct} gap is inside the oracles’ noise floor. Trading it only pays fees.`,
+              body: `The ${gapPct} gap is inside the noise floor. Trading it only pays fees.`,
             }
         : against
           ? {
