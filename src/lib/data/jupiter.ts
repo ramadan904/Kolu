@@ -153,7 +153,7 @@ export class JupiterSource implements QuoteSource {
         userPublicKey,
         wrapAndUnwrapSol: true,
         dynamicComputeUnitLimit: true,
-        prioritizationFeeLamports: { priorityLevelWithMaxLamports: { priorityLevel: "medium", maxLamports: 4_000_000 } },
+        prioritizationFeeLamports: { priorityLevelWithMaxLamports: { priorityLevel: "medium", maxLamports: 1_500_000 } },
       }),
     });
 

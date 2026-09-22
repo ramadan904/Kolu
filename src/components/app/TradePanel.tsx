@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge, Dot } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
-import { fmtAmount, SOL_MINT, SOL_RESERVE, TOKEN_ACCOUNT_RENT_SOL } from "@/lib/tokens";
+import { fmtAmount, SOL_FEE_RESERVE, SOL_MINT, TOKEN_ACCOUNT_RENT_SOL } from "@/lib/tokens";
 import { describeTradeError, fromBaseUnits, jupiterOutAmount } from "@/lib/trade";
 import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 import { pollConfirmation } from "@/lib/confirm";
@@ -188,8 +188,12 @@ export function TradePanel({
   const tokenHeld = tokenMint ? (balances.get(tokenMint)?.amount ?? 0) : 0;
   const usdcHeld = quoteMint ? (balances.get(quoteMint)?.amount ?? 0) : 0;
   const solHeld = balances.get(SOL_MINT)?.amount ?? 0;
-  // SOL is spendable only above the reserve that pays the swap's own fees.
-  const solSpendable = Math.max(0, solHeld - SOL_RESERVE);
+  // A first buy of a token also opens its account, which parks rent in it.
+  const needsAccount = !!tokenMint && !balances.has(tokenMint);
+  // SOL is spendable above the swap's own costs, and no further: holding back
+  // more than the fees need would put part of a small wallet out of reach.
+  const solReserve = SOL_FEE_RESERVE + (side === "buy" && needsAccount ? TOKEN_ACCOUNT_RENT_SOL : 0);
+  const solSpendable = Math.max(0, solHeld - solReserve);
 
   // Pay (or receive) in USDC or native SOL. Chosen for the wallet once its
   // balances are known — a wallet with SOL and no USDC should not have to find
@@ -204,12 +208,14 @@ export function TradePanel({
   const held = side === "sell" ? tokenHeld : payAsset === "SOL" ? solSpendable : usdcHeld;
   const payUnit = side === "sell" ? reading.tokenTicker : payAsset;
   const balancesKnown = connected && !loadingBalances && !balanceError;
+  // The largest trade this wallet can actually place right now, in USD.
+  const maxUsd =
+    side === "sell" ? tokenHeld * tokenPrice : payAsset === "SOL" ? solSpendable * (solPrice ?? 0) : usdcHeld;
   // Only claim a shortfall once balances have actually been read.
   const shortfall = balancesKnown && sizeValid && held < needed * 0.9999;
   // Every swap pays its network fee in SOL, whatever it trades.
   const feeShortfall = balancesKnown && solHeld < MIN_FEE_SOL;
-  // A first buy creates the token's account, which holds a small rent deposit.
-  const needsAccount = balancesKnown && side === "buy" && !!tokenMint && !balances.has(tokenMint);
+
 
   const busy = tx.kind === "building" || tx.kind === "signing" || tx.kind === "sending";
 
@@ -1059,7 +1065,24 @@ export function TradePanel({
               <p className="mb-3 text-[12px] leading-relaxed text-[var(--warn)]">
                 This trade needs <span className="num">{fmtAmount(needed)}</span> {payUnit}; the
                 wallet {payUnit === "SOL" ? "can spend" : "holds"} <span className="num">{fmtAmount(held)}</span>
-                {payUnit === "SOL" && <> (keeping {SOL_RESERVE} SOL back for fees)</>}.
+                {payUnit === "SOL" && (
+                  <>
+                    {" "}
+                    of its <span className="num">{fmtAmount(solHeld)}</span>, keeping{" "}
+                    <span className="num">{solReserve.toFixed(4)}</span> back for the fee
+                    {needsAccount ? " and this token's account rent" : ""}
+                  </>
+                )}
+                .{" "}
+                {maxUsd >= MIN_NOTIONAL_USD && (
+                  <button
+                    type="button"
+                    onClick={() => setSize(maxUsd, true)}
+                    className="text-[var(--accent)] underline-offset-2 hover:underline"
+                  >
+                    Trade {fmtUsd(maxUsd, maxUsd >= 1000 ? 0 : 2)} instead
+                  </button>
+                )}
               </p>
             )}
             {feeShortfall && (
@@ -1068,7 +1091,7 @@ export function TradePanel({
                 <span className="num">{fmtAmount(solHeld)}</span>. Add about 0.01 SOL to trade.
               </p>
             )}
-            {needsAccount && !shortfall && !feeShortfall && sizeValid && (
+            {balancesKnown && needsAccount && side === "buy" && !shortfall && !feeShortfall && sizeValid && (
               <p className="mb-3 text-[12px] leading-relaxed text-[var(--text-3)]">
                 First {reading.tokenTicker} in this wallet: the swap also opens its token account, which holds
                 about {TOKEN_ACCOUNT_RENT_SOL} SOL of rent (refundable if the account is closed). It is not

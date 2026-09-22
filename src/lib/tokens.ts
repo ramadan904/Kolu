@@ -76,11 +76,11 @@ export function fmtAmount(amount: number): string {
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const SOL_DECIMALS = 9;
 /**
- * SOL kept back when paying in SOL: network and priority fees, plus rent for
- * the token account a first buy of an xStock creates (~0.0021 SOL, refunded if
- * the account is ever closed). Spending past this can leave a swap unable to
- * land.
+ * SOL kept back for the swap's own fees when paying in SOL: the base fee plus
+ * the priority fee's ceiling, with a little room over. Held down deliberately
+ * — a reserve larger than the fees it covers quietly shrinks how much of a
+ * small wallet can be traded at all.
  */
-export const SOL_RESERVE = 0.01;
+export const SOL_FEE_RESERVE = 0.0025;
 /** Rent deposit for a new Token-2022 account, SOL. Shown before a first buy. */
 export const TOKEN_ACCOUNT_RENT_SOL = 0.0021;
