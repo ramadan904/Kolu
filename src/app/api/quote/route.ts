@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { JupiterSource, toBaseUnits } from "@/lib/data/jupiter";
 import { executionReady, loadMints } from "@/lib/mints";
 import { findEntry } from "@/lib/universe";
+import { boundedImpactBps } from "@/lib/trade";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,7 +86,15 @@ export async function GET(request: Request) {
         available: true,
         side,
         slippageBps,
-        priceImpactBps: quote.priceImpactBps,
+        // Cross-checked against the quote's own amounts; Jupiter's figure is kept alongside.
+        priceImpactBps: boundedImpactBps({
+          reportedBps: quote.priceImpactBps,
+          side,
+          inAmount: Number(quote.inAmount) / 10 ** (side === "buy" ? quoteMint.decimals : tokenMint.decimals),
+          outAmount: Number(quote.outAmount) / 10 ** (side === "buy" ? tokenMint.decimals : quoteMint.decimals),
+          price: tokenPrice,
+        }),
+        reportedImpactBps: quote.priceImpactBps,
         route: quote.route,
         // BigInt is not JSON-serialisable; amounts go out as strings.
         inAmount: quote.inAmount.toString(),

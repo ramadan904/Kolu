@@ -1212,11 +1212,15 @@ function Verdict({
 }) {
   return (
     <div
-      className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--raised)] py-3 pr-4 pl-3.5"
-      style={{ boxShadow: `inset 3px 0 0 ${VERDICT_COLOR[tone]}` }}
+      className="relative overflow-hidden rounded-[var(--radius)] border py-3.5 pr-4 pl-4"
+      style={{
+        borderColor: tone === "neutral" ? "rgba(255,255,255,0.09)" : `color-mix(in srgb, ${VERDICT_COLOR[tone]} 35%, transparent)`,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${VERDICT_COLOR[tone]} ${tone === "neutral" ? 4 : 12}%, transparent), rgba(255,255,255,0.015) 60%)`,
+        boxShadow: `inset 3px 0 0 ${VERDICT_COLOR[tone]}${tone === "neutral" ? "" : `, 0 12px 40px -18px ${VERDICT_COLOR[tone]}`}`,
+      }}
       role="status"
     >
-      <div className="text-[15px] font-semibold tracking-[-0.01em]" style={{ color: tone === "neutral" ? "var(--text)" : VERDICT_COLOR[tone] }}>
+      <div className="text-[16px] font-semibold tracking-[-0.015em]" style={{ color: tone === "neutral" ? "var(--text)" : VERDICT_COLOR[tone] }}>
         {title}
       </div>
       {body && <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--text-2)]">{body}</p>}

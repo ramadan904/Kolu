@@ -103,3 +103,30 @@ export function jupiterOutAmount(
   if (returnData?.programId === JUPITER_V6) return decodeU64Base64(returnData.data?.[0]);
   return null;
 }
+
+/**
+ * Price impact a quote can honestly claim. Jupiter reports its own
+ * `priceImpactPct`, which on multi-hop routes occasionally spikes far above
+ * what the same quote's amounts imply — a $2k clip once read 70bps of impact
+ * while it delivered within 55bps of mid. Impact cannot exceed the quote's
+ * whole realised cost against the mid price (that cost already includes it),
+ * so the smaller of the two is used; a fill better than mid claims none.
+ */
+export function boundedImpactBps(p: {
+  reportedBps: number;
+  side: "buy" | "sell";
+  /** USDC in for a buy, tokens in for a sell. */
+  inAmount: number;
+  /** Tokens out for a buy, USDC out for a sell. */
+  outAmount: number;
+  /** Token mid price, USD. */
+  price: number;
+}): number {
+  const reported = Math.max(0, p.reportedBps);
+  if (!(p.price > 0) || !(p.inAmount > 0) || !(p.outAmount > 0)) return reported;
+  const usdIn = p.side === "buy" ? p.inAmount : p.inAmount * p.price;
+  const usdOut = p.side === "buy" ? p.outAmount * p.price : p.outAmount;
+  const realised = (1 - usdOut / usdIn) * 10_000;
+  if (!Number.isFinite(realised)) return reported;
+  return Math.min(reported, Math.max(0, realised));
+}

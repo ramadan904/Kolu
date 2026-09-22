@@ -103,23 +103,30 @@ export function TradeDrawer({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/70 backdrop-blur-[3px]"
       />
 
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative flex h-full w-full min-w-0 max-w-[600px] flex-col border-l border-[var(--border)] bg-[var(--surface)] outline-none"
+        className="relative flex h-full w-full min-w-0 max-w-[600px] flex-col border-l border-white/10 shadow-[-40px_0_80px_-20px_rgba(0,0,0,0.9)]"
+        // Focus lands here for the keyboard; the site-wide ring would draw a
+        // stray line down the panel's edge.
+        style={{
+          outline: "none",
+          background:
+            "radial-gradient(520px 260px at 80% -60px, rgba(59,130,255,0.16), transparent 70%), linear-gradient(180deg, #0b0c12, #07080c)",
+        }}
       >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4 sm:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-[22px] font-semibold tracking-[-0.025em]">
+              <h2 className="display text-electric text-[30px] leading-none">
                 {reading.tokenTicker}
               </h2>
               <Badge tone={status.tone}>{status.text}</Badge>
             </div>
-            <p className="mt-0.5 truncate text-[13px] text-[var(--text-3)]">{reading.name}</p>
+            <p className="mono mt-1.5 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-3)]">{reading.name} · vs the real share</p>
           </div>
 
           <div className="-mr-1 flex items-center gap-1">
@@ -151,7 +158,7 @@ export function TradeDrawer({
 
         {/* The three numbers the decision rests on, restated so nobody trades
             against a figure they have scrolled past. */}
-        <div className="grid grid-cols-3 gap-px border-b border-[var(--border)] bg-[var(--border)]">
+        <div className="grid grid-cols-3 gap-px border-b border-white/[0.07] bg-white/[0.07]">
           <Stat label="Token" value={reading.token ? fmtUsd(reading.token.price) : "—"} />
           <Stat label="Real share" value={reading.equity ? fmtUsd(reading.equity.price) : "—"} />
           <Stat
@@ -227,11 +234,10 @@ function Stat({
   tone?: "down" | "up";
 }) {
   return (
-    <div className="bg-[var(--surface)] px-5 py-3.5 sm:px-6">
-      <div className="text-[10px] uppercase tracking-[0.09em] text-[var(--text-3)]">{label}</div>
+    <div className="bg-[#08090d] px-5 py-4 sm:px-6">
+      <div className="mono text-[10px] uppercase tracking-[0.09em] text-[var(--text-3)]">{label}</div>
       <div
-        className="num mt-1 text-[17px] font-semibold"
-        style={{ color: tone ? `var(--${tone})` : "var(--text)" }}
+        className={`display num mt-1.5 text-[22px] leading-none ${tone === "down" ? "text-cheap" : tone === "up" ? "text-rich" : "text-white"}`}
       >
         {value}
       </div>
