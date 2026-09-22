@@ -29,7 +29,19 @@ export interface Dislocation {
   spark: [number, number, boolean][];
   /** Every open in the last week: the gap before, after, and how much closed. */
   opens: OpenEvent[];
+  /**
+   * The week at 30-minute medians, for the backtest:
+   * [unix s, gap bps, session (0 open · 1 extended hours · 2 shut), token USD, share USD].
+   */
+  week: WeekRow[];
 }
+
+export type { WeekRow } from "@/lib/backtest";
+import type { WeekRow } from "@/lib/backtest";
+
+const sessionCode = (phase: SessionPhase): 0 | 1 | 2 =>
+  phase === "regular" ? 0 : SHUT.has(phase) ? 2 : 1;
+const sig = (n: number) => Number(n.toPrecision(6));
 
 const SHUT = new Set<SessionPhase>(["closed", "weekend", "holiday"]);
 
@@ -69,6 +81,9 @@ export async function GET() {
       clearedCosts: Math.abs(widest.basisBps) >= breakeven,
       spark: hourly.map((p) => [p.t, Math.round(p.basisBps * 10) / 10, SHUT.has(p.phase)]),
       opens: openEvents(week),
+      week: downsample(week, 1_800_000)
+        .filter((p) => p.token !== undefined && p.equity !== undefined)
+        .map((p) => [Math.round(p.t / 1000), Math.round(p.basisBps * 10) / 10, sessionCode(p.phase), sig(p.token!), sig(p.equity!)]),
     });
   }
 

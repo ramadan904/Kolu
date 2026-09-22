@@ -21,6 +21,9 @@ export interface HistoryPoint {
   t: number;
   basisBps: number;
   phase: SessionPhase;
+  /** Real history only: the token's close and the share print it was measured against, USD. */
+  token?: number;
+  equity?: number;
 }
 
 export interface HistorySeries {

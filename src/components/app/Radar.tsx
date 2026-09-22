@@ -28,12 +28,15 @@ import { GapHistory } from "./GapHistory";
 import { RecentDislocations } from "./RecentDislocations";
 import { HowItReads } from "./HowItReads";
 import { OpenConvergence } from "./OpenConvergence";
+import { Backtest } from "./Backtest";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
 import { breakevenBps } from "@/lib/basis/edge";
 import type { Scenario } from "@/lib/data/fixtures";
-import { findEntry } from "@/lib/universe";
+import { findEntry, UNIVERSE } from "@/lib/universe";
+import { fmtPct } from "@/lib/format";
+import { CommandPalette, PaletteButton, type Command } from "./CommandPalette";
 import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 
 const POLL_MS = 10_000;
@@ -279,11 +282,94 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
   const detail = selected ? board.readings.find((r) => r.ticker === selected) : null;
 
+  // Everything on the page, one search away (⌘K or /).
+  const commands = useMemo<Command[]>(() => {
+    const scrollTo = (id: string) => () =>
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const pairs: Command[] = UNIVERSE.flatMap((entry) => {
+      const r = board.readings.find((x) => x.ticker === entry.ticker);
+      const gap = r?.basisBps ?? null;
+      const trade: Command = {
+        id: `trade-${entry.ticker}`,
+        group: "Pairs",
+        label: `Trade ${entry.tokenTicker} · ${entry.name}`,
+        hint: gap === null ? undefined : fmtPct(gap),
+        hintColor: gap === null ? undefined : gap < 0 ? "var(--down)" : "var(--up)",
+        keywords: `${entry.ticker} ticket buy sell swap limit`,
+        run: () => {
+          if (demo && entry.tier !== "core") setDemo(null);
+          if (entry.tier !== "core") setTier("all");
+          openTrade(entry.ticker);
+        },
+      };
+      if (entry.tier !== "core") return [trade];
+      return [
+        trade,
+        {
+          id: `chart-${entry.ticker}`,
+          group: "Pairs",
+          label: `Chart ${entry.tokenTicker} · 7 days of real gaps`,
+          keywords: `${entry.ticker} ${entry.name} history gap chart week`,
+          run: () => showHistory(entry.ticker, 7),
+        },
+      ];
+    });
+    const goto: Command[] = [
+      { id: "go-position", group: "Go to", label: "Your position", keywords: "portfolio holdings wallet pnl", run: scrollTo("position") },
+      { id: "go-history", group: "Go to", label: "Gap history", keywords: "chart 48h 7d", run: scrollTo("gap-history") },
+      { id: "go-pairs", group: "Go to", label: "All tracked pairs", keywords: "table board", run: scrollTo("pairs") },
+      { id: "go-dislocations", group: "Go to", label: "Recent dislocations", keywords: "widest movers", run: scrollTo("recent-dislocations") },
+      { id: "go-open", group: "Go to", label: "Does the gap close at the open?", keywords: "convergence thesis", run: scrollTo("open-convergence") },
+      { id: "go-backtest", group: "Go to", label: "Backtest · would trading the gap have paid?", keywords: "strategy simulate threshold", run: scrollTo("backtest") },
+      { id: "go-how", group: "Go to", label: "How Kolu reads a gap", keywords: "noise floor hedge breakeven explain", run: scrollTo("how-it-reads") },
+    ];
+    const actions: Command[] = [
+      demo
+        ? { id: "live", group: "Actions", label: "Back to live prices", keywords: "replay stop demo", run: () => { setSelected(null); setDemo(null); } }
+        : { id: "replay", group: "Actions", label: "Replay a dislocation", keywords: "demo scenario gap opens", run: () => { setSelected(null); setDemo("live_dislocation"); } },
+      {
+        id: "example",
+        group: "Actions",
+        label: "See a live portfolio · Kraken hot wallet",
+        keywords: "example watch address holdings",
+        run: () => {
+          setDemo(null);
+          watch(EXAMPLE_WALLET.address);
+          requestAnimationFrame(scrollTo("position"));
+        },
+      },
+      tier === "all"
+        ? { id: "tier-core", group: "Actions", label: "Show liquid pairs only", keywords: "filter core", run: () => setTier("core") }
+        : { id: "tier-all", group: "Actions", label: "Show all 12 pairs", keywords: "filter extended every", run: () => setTier("all") },
+      {
+        id: "arm",
+        group: "Actions",
+        label: "Alert me when any gap pays",
+        hint: `${breakeven}bps`,
+        keywords: "alerts notify arm breakeven",
+        run: armBreakeven,
+      },
+      {
+        id: "copy",
+        group: "Actions",
+        label: "Copy link to this view",
+        keywords: "share url",
+        run: () => void navigator.clipboard?.writeText(window.location.href).catch(() => undefined),
+      },
+      { id: "health", group: "Actions", label: "System health", keywords: "status api sources", run: () => window.open("/api/health", "_blank", "noopener") },
+    ];
+    return [...pairs, ...goto, ...actions];
+    // showHistory is recreated each render but only closes over setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board.readings, demo, tier, breakeven, armBreakeven, openTrade, watch]);
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <MarketClock session={board.session} />
         <div className="flex items-center gap-2">
+          <PaletteButton />
+          <CommandPalette commands={commands} />
           {board.degraded === "no_feeds" ? (
             <Badge tone="up">Misconfigured</Badge>
           ) : board.source === "fixture" ? (
@@ -351,7 +437,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         }}
       />
 
-      <div className="mt-4" />
+      <div className="mt-4 scroll-mt-4" id="position" />
       <ErrorBoundary name="Your position">
       <Portfolio
         readings={board.readings}
@@ -430,7 +516,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         />
       </ErrorBoundary>
 
-      <div className="mb-3 flex items-center justify-between">
+      <div id="pairs" className="mb-3 flex scroll-mt-4 items-center justify-between">
         <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
           All tracked pairs
         </h2>
@@ -474,6 +560,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           </ErrorBoundary>
           <ErrorBoundary name="Open convergence">
             <OpenConvergence onSelect={(t) => showHistory(t, 7)} />
+          </ErrorBoundary>
+          <ErrorBoundary name="Backtest">
+            <Backtest onTrade={(t) => openTrade(t)} />
           </ErrorBoundary>
         </>
       )}

@@ -108,6 +108,21 @@ usually narrows — not always, and the misses are shown, because "it converges
 by the open" is exactly the bet a closed-market trade is making. The chart
 switches between 48 hours and 7 days, so a full weekend is always in view.
 
+**A backtest that can say no.** *Would trading the gap have paid?* replays
+last week's real trades: while the market is shut, when a gap reaches your
+threshold, take the side that captures it at your size, and unwind 30 minutes,
+an hour or three hours into the open. Every trade is priced after the round-trip
+cost model, and reported twice — the gap captured (what a trader able to hedge
+would keep) and the token's actual return (the share's own move included, which
+is the risk of a closed-market trade). A sweep across every threshold shows
+where it paid last week, labelled hindsight. Most weeks, at most thresholds, the
+honest answer is that costs eat the gap; the tool shows that rather than a
+flattering curve.
+
+**Everything one keystroke away.** ⌘K (Ctrl K) or `/` opens a command palette:
+any pair's ticket or 7-day chart with its live gap, every section, replay, the
+example portfolio, alerts, copy link.
+
 **Alerts that respect your sleep.** Arm a threshold per ticker and Kolu watches
 for you, in-page and via browser notification. What matters is what it refuses
 to fire on: a gap inside the oracle noise floor, or one measured against a feed

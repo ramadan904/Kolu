@@ -131,7 +131,7 @@ armed at the break-even gap for a $10k trade. "It never fires on noise or on a
 stalled feed; one false alarm at 3am gets the feature muted."
 
 **2:20 — The close.** "Live prices, live routes, verified mints, a swap that
-can't be reported as filled when it reverted. 213 tests. Every view is a link —
+can't be reported as filled when it reverted. 218 tests. Every view is a link —
 this one opens the ticket." Copy link from the ticket; cut to the repo.
 
 ---
@@ -147,7 +147,7 @@ closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. A wallet trade flow — live Jupiter quote, wallet signature,
 polled confirmation that never reports a reverted swap as filled — and a
 positions view that values any Solana address's real xStock holdings against
-the live gaps. 213 tests. Falls back to labelled demo data when the live source
+the live gaps. 218 tests. Falls back to labelled demo data when the live source
 is unreachable.
 
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve

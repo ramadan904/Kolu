@@ -43,6 +43,8 @@ export function alignBasis(token: PriceBar[], equity: PriceBar[]): HistoryPoint[
       t: bar.t * 1000,
       basisBps: ((bar.close - ref) / ref) * 10_000,
       phase: getMarketSession(new Date(bar.t * 1000)).phase,
+      token: bar.close,
+      equity: ref,
     });
   }
   return out;
@@ -246,13 +248,20 @@ export function downsample(points: HistoryPoint[], bucketMs = 3600_000): History
   return [...buckets.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([k, list]) => {
-      const vals = list.map((p) => p.basisBps).sort((a, b) => a - b);
-      const m = Math.floor(vals.length / 2);
-      return {
+      const mid = <T,>(xs: T[], key: (x: T) => number | undefined) => {
+        const vals = xs.map(key).filter((v): v is number => v !== undefined).sort((a, b) => a - b);
+        return median(vals) ?? undefined;
+      };
+      const out: HistoryPoint = {
         t: k * bucketMs + bucketMs / 2,
-        basisBps: vals.length % 2 ? vals[m] : (vals[m - 1] + vals[m]) / 2,
+        basisBps: mid(list, (p) => p.basisBps)!,
         phase: list[Math.floor(list.length / 2)].phase,
       };
+      const token = mid(list, (p) => p.token);
+      const equity = mid(list, (p) => p.equity);
+      if (token !== undefined) out.token = token;
+      if (equity !== undefined) out.equity = equity;
+      return out;
     });
 }
 
