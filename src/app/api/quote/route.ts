@@ -3,6 +3,8 @@ import { JupiterSource, toBaseUnits } from "@/lib/data/jupiter";
 import { executionReady, loadMints } from "@/lib/mints";
 import { findEntry } from "@/lib/universe";
 import { boundedImpactBps } from "@/lib/trade";
+import { SOL_DECIMALS, SOL_MINT } from "@/lib/tokens";
+import { solUsdPrice } from "@/lib/data/sol-price";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,6 +34,9 @@ export async function GET(request: Request) {
   // Impact is not symmetric — the thin side of the book is the one that costs
   // you — so quoting the wrong direction measures a trade nobody would make.
   const side = params.get("side") === "sell" ? "sell" : "buy";
+  // What the other leg is: USDC, or native SOL for a wallet that holds no
+  // stablecoin. Jupiter wraps and unwraps SOL inside the same transaction.
+  const pay = params.get("pay") === "SOL" ? "SOL" : "USDC";
   // Clamped rather than trusted: a quote requested with absurd tolerance is a
   // quote that can fill anywhere.
   const slippageRaw = Number(params.get("slippageBps") ?? "30");
@@ -57,16 +62,18 @@ export async function GET(request: Request) {
     );
   }
 
-  const quoteMint = mints.quote!;
   const tokenMint = mints.tokens[entry.ticker];
 
   try {
+    const quoteMint = pay === "SOL" ? { mint: SOL_MINT, decimals: SOL_DECIMALS } : mints.quote!;
+    const payPriceUsd = pay === "SOL" ? await solUsdPrice() : 1;
     const request =
       side === "buy"
         ? {
             inputMint: quoteMint.mint,
             outputMint: tokenMint.mint,
-            amount: toBaseUnits(notional, quoteMint.decimals),
+            // The USD notional, in whatever is being paid with.
+            amount: toBaseUnits(notional / payPriceUsd, quoteMint.decimals),
             slippageBps,
           }
         : {
@@ -85,6 +92,9 @@ export async function GET(request: Request) {
       {
         available: true,
         side,
+        pay,
+        /** USD per unit of the pay asset (1 for USDC), so the ticket can size and check SOL. */
+        payPriceUsd,
         slippageBps,
         // Cross-checked against the quote's own amounts; Jupiter's figure is kept alongside.
         priceImpactBps: boundedImpactBps({
@@ -93,6 +103,7 @@ export async function GET(request: Request) {
           inAmount: Number(quote.inAmount) / 10 ** (side === "buy" ? quoteMint.decimals : tokenMint.decimals),
           outAmount: Number(quote.outAmount) / 10 ** (side === "buy" ? tokenMint.decimals : quoteMint.decimals),
           price: tokenPrice,
+          payPriceUsd,
         }),
         reportedImpactBps: quote.priceImpactBps,
         route: quote.route,

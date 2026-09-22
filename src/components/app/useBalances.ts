@@ -15,6 +15,8 @@ import { PublicKey, type Connection } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   parseTokenBalances,
+  SOL_DECIMALS,
+  SOL_MINT,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   type TokenBalance,
@@ -92,15 +94,21 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function readBalances(connection: Connection, owner: PublicKey) {
   for (let attempt = 0; ; attempt += 1) {
     try {
-      const [classic, token2022] = await Promise.all([
+      const [classic, token2022, lamports] = await Promise.all([
         connection.getParsedTokenAccountsByOwner(owner, {
           programId: new PublicKey(TOKEN_PROGRAM_ID),
         }),
         connection.getParsedTokenAccountsByOwner(owner, {
           programId: new PublicKey(TOKEN_2022_PROGRAM_ID),
         }),
+        // Native SOL: a wallet can pay for a trade in SOL, not only USDC.
+        connection.getBalance(owner, "confirmed"),
       ]);
-      return new Map([...parseTokenBalances(classic), ...parseTokenBalances(token2022)]);
+      const out = new Map([...parseTokenBalances(classic), ...parseTokenBalances(token2022)]);
+      // Filed under the SOL mint, with any wrapped SOL added: Jupiter unwraps it too.
+      const wrapped = out.get(SOL_MINT)?.amount ?? 0;
+      out.set(SOL_MINT, { mint: SOL_MINT, amount: lamports / 10 ** SOL_DECIMALS + wrapped, decimals: SOL_DECIMALS });
+      return out;
     } catch (err) {
       if (!isRateLimit(err) || attempt >= RETRY_DELAYS_MS.length) throw err;
       await sleep(RETRY_DELAYS_MS[attempt]);

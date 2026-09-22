@@ -6,6 +6,7 @@ import { computeEdge, sideForGap } from "@/lib/basis/edge";
 import { EXAMPLE_WALLET, knownLabel } from "@/lib/known-wallets";
 import type { MintMap, Side } from "./TradePanel";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useActivity, type ActivityState } from "./useActivity";
 import { OpenOrders, useOpenOrders } from "./OpenOrders";
 import { ago } from "@/lib/activity";
@@ -115,6 +116,7 @@ export function Portfolio({
   // P&L needs an entry price, and entry prices are the owner's own record:
   // only for a connected wallet, never a watched address.
   const pnlOwner = !demo && !watching ? owner : null;
+  const { disconnect } = useWallet();
   const { journal, setManual } = useJournal(pnlOwner);
 
   // Every hook above runs on every render; early returns only below this line.
@@ -289,13 +291,22 @@ export function Portfolio({
         >
           {address.slice(0, 4)}…{address.slice(-4)} ↗
         </a>
-        {watching && (
+        {watching ? (
           <button
             type="button"
             onClick={stopWatching}
             className="transition-colors hover:text-white"
           >
             Stop
+          </button>
+        ) : (
+          // Ends the session: the wallet forgets this site until you connect again.
+          <button
+            type="button"
+            onClick={() => void disconnect()}
+            className="rounded-[6px] border border-white/10 px-2 py-0.5 transition-colors hover:border-[var(--up)]/50 hover:text-[var(--up)]"
+          >
+            Log out
           </button>
         )}
       </div>

@@ -55,7 +55,10 @@ interface Row {
 }
 
 function isMobileDevice() {
-  return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (typeof navigator === "undefined") return false;
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
+  // iPadOS asks for the desktop site and reports itself as a Mac; touch gives it away.
+  return /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
 }
 
 /**
@@ -243,7 +246,7 @@ export function WalletButton({
                 setMenuOpen(false);
               }}
             >
-              Disconnect
+              Log out
             </MenuItem>
           </div>
         )}
@@ -331,7 +334,11 @@ function WalletPicker({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative w-full max-w-[420px] rounded-t-[14px] border border-[var(--border)] bg-[var(--surface)] p-5 outline-none sm:rounded-[14px]"
+        className="relative max-h-[92vh] w-full max-w-[440px] overflow-y-auto rounded-t-[16px] border border-white/10 p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] sm:rounded-[16px]"
+        style={{
+          outline: "none",
+          background: "radial-gradient(420px 200px at 50% -40px, rgba(59,130,255,0.18), transparent 70%), #0a0b10",
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -384,6 +391,8 @@ function WalletPicker({
             {error}
           </p>
         )}
+
+        {!isMobileDevice() && <PhoneHandoff />}
 
         <p className="mt-4 border-t border-[var(--border)] pt-3 text-[12px] leading-relaxed text-[var(--text-3)]">
           No wallet yet? Phantom and Solflare take about a minute to set up. Or explore first —
@@ -439,5 +448,101 @@ function WalletRow({
         </span>
       </button>
     </li>
+  );
+}
+
+/**
+ * Desktop to phone: a QR code that opens this exact page inside the chosen
+ * wallet's app on a phone — Phantom, Solflare or Backpack — where the wallet
+ * is already present and connects in one tap. Scanned with the phone's camera;
+ * no extension, no pairing, nothing leaves this page but its own URL.
+ */
+function PhoneHandoff() {
+  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState(0);
+  const [svg, setSvg] = useState<string | null>(null);
+  const f = FEATURED[pick];
+  const here = typeof window === "undefined" ? "" : window.location.href;
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const link = f.browse(here, origin);
+  const local = /localhost|127.0.0.1/.test(origin);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void import("qrcode").then((QR) =>
+      QR.toString(link, { type: "svg", margin: 0, errorCorrectionLevel: "M", color: { dark: "#05060a", light: "#ffffff" } }).then(
+        (s) => !cancelled && setSvg(s),
+      ),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [open, link]);
+
+  return (
+    <div className="mt-5 rounded-[12px] border border-white/[0.08] bg-white/[0.02]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
+      >
+        <span className="flex items-center gap-2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-[var(--accent-2)]">
+            <rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M11 18h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <span>
+            <span className="block text-[13px] font-medium text-white">Use the wallet on your phone</span>
+            <span className="block text-[12px] text-[var(--text-3)]">Scan a code, Kolu opens inside the wallet app</span>
+          </span>
+        </span>
+        <span className={`text-[var(--text-3)] transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+      </button>
+      {open && (
+        <div className="border-t border-white/[0.07] px-3.5 pt-3 pb-4">
+          <div className="flex gap-1 rounded-[8px] bg-black/30 p-0.5" role="tablist" aria-label="Phone wallet">
+            {FEATURED.map((w, i) => (
+              <button
+                key={w.name}
+                type="button"
+                role="tab"
+                aria-selected={i === pick}
+                onClick={() => setPick(i)}
+                className={`flex-1 rounded-[6px] py-1.5 text-[12px] font-medium transition-colors ${
+                  i === pick ? "bg-white/[0.09] text-white" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                {w.name}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-4">
+            <div
+              className="flex h-[132px] w-[132px] shrink-0 items-center justify-center rounded-[10px] bg-white p-2.5"
+              aria-label={`QR code: open Kolu in ${f.name}`}
+              role="img"
+            >
+              {svg ? (
+                <span className="block h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+              ) : (
+                <span className="skeleton h-full w-full" />
+              )}
+            </div>
+            <ol className="space-y-1.5 text-[12px] leading-snug text-[var(--text-2)]">
+              <li>1. Open your phone&rsquo;s camera and point it at the code.</li>
+              <li>2. Tap the link: {f.name} opens with Kolu inside it.</li>
+              <li>3. Tap Connect wallet there — {f.name} is already signed in.</li>
+            </ol>
+          </div>
+          {local && (
+            <p className="mt-3 text-[11px] text-[var(--warn)]">
+              This page is running on your computer, so a phone cannot reach it. Use the live site to hand off.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

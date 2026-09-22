@@ -22,3 +22,11 @@ describe("boundedImpactBps", () => {
     expect(boundedImpactBps({ reportedBps: -2, side: "buy", inAmount: 1000, outAmount: 4, price: 0 })).toBe(0);
   });
 });
+
+describe("boundedImpactBps paying in SOL", () => {
+  it("prices the SOL leg at its USD price", () => {
+    // Paid 0.02 SOL at $150 ($3) for 0.013 tokens at mid 226.45 ($2.944): ~187bps realised.
+    const bps = boundedImpactBps({ reportedBps: 400, side: "buy", inAmount: 0.02, outAmount: 0.013, price: 226.45, payPriceUsd: 150 });
+    expect(bps).toBeCloseTo(187.2, 0);
+  });
+});

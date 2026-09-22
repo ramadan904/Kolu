@@ -121,11 +121,14 @@ export function boundedImpactBps(p: {
   outAmount: number;
   /** Token mid price, USD. */
   price: number;
+  /** USD per unit of the other leg: 1 for USDC, the SOL price for SOL. */
+  payPriceUsd?: number;
 }): number {
   const reported = Math.max(0, p.reportedBps);
   if (!(p.price > 0) || !(p.inAmount > 0) || !(p.outAmount > 0)) return reported;
-  const usdIn = p.side === "buy" ? p.inAmount : p.inAmount * p.price;
-  const usdOut = p.side === "buy" ? p.outAmount * p.price : p.outAmount;
+  const pay = p.payPriceUsd && p.payPriceUsd > 0 ? p.payPriceUsd : 1;
+  const usdIn = p.side === "buy" ? p.inAmount * pay : p.inAmount * p.price;
+  const usdOut = p.side === "buy" ? p.outAmount * p.price : p.outAmount * pay;
   const realised = (1 - usdOut / usdIn) * 10_000;
   if (!Number.isFinite(realised)) return reported;
   return Math.min(reported, Math.max(0, realised));

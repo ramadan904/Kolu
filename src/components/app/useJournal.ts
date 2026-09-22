@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
-import { classify, type ParsedTxLike } from "@/lib/activity";
+import { classify, nativeSolDelta, type ParsedTxLike } from "@/lib/activity";
+import { SOL_MINT } from "@/lib/tokens";
 import { loadJournal, saveJournal, withFill, withManual, type Journal } from "@/lib/journal";
 
 const CHANGE_EVENT = "kolu:journal";
@@ -50,7 +51,8 @@ export async function recordFill(
   owner: string,
   ticker: string,
   tokenMint: string,
-  usdcMint: string,
+  /** The other leg: USDC at $1, or native SOL at its price when quoted. */
+  pay: { mint: string; priceUsd: number },
 ): Promise<void> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
@@ -59,18 +61,33 @@ export async function recordFill(
         commitment: "confirmed",
       })) as ParsedTransactionWithMeta | null;
       if (tx) {
-        const item = classify(tx as unknown as ParsedTxLike, owner, { [tokenMint]: ticker }, usdcMint);
-        if (!item || item.failed || item.usdcAmount === null) return;
-        if (item.kind !== "bought" && item.kind !== "sold") return;
+        const parsed = tx as unknown as ParsedTxLike;
+        const sol = pay.mint === SOL_MINT;
+        const item = classify(parsed, owner, { [tokenMint]: ticker }, sol ? null : pay.mint);
+        if (!item || item.failed) return;
+        let usd = item.usdcAmount;
+        let kind = item.kind;
+        if (sol) {
+          // Native SOL is not a token balance: read the lamports that moved,
+          // net of fee and new-account rent, and value them at the quoted price.
+          const delta = nativeSolDelta(parsed, owner);
+          if (delta === null || !(pay.priceUsd > 0)) return;
+          const bought = item.kind === "received" && delta < 0;
+          const sold = item.kind === "sent" && delta > 0;
+          if (!bought && !sold) return;
+          kind = bought ? "bought" : "sold";
+          usd = Math.abs(delta) * pay.priceUsd;
+        }
+        if (usd === null || (kind !== "bought" && kind !== "sold")) return;
         saveJournal(
           owner,
           withFill(loadJournal(owner), {
             signature,
             t: (item.time ?? Math.floor(Date.now() / 1000)) * 1000,
             ticker,
-            side: item.kind === "bought" ? "buy" : "sell",
+            side: kind === "bought" ? "buy" : "sell",
             tokenAmount: item.tokenAmount,
-            usdcAmount: item.usdcAmount,
+            usdcAmount: usd,
           }),
         );
         window.dispatchEvent(new Event(CHANGE_EVENT));

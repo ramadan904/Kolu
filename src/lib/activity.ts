@@ -25,6 +25,7 @@ export interface Activity {
 interface TokenBalanceLike {
   mint: string;
   owner?: string;
+  accountIndex?: number;
   uiTokenAmount: { uiAmount: number | null; amount?: string; decimals?: number };
 }
 
@@ -33,10 +34,16 @@ export interface ParsedTxLike {
   blockTime?: number | null;
   meta: {
     err: unknown;
+    fee?: number;
+    preBalances?: number[];
+    postBalances?: number[];
     preTokenBalances?: TokenBalanceLike[] | null;
     postTokenBalances?: TokenBalanceLike[] | null;
   } | null;
-  transaction: { signatures: string[] };
+  transaction: {
+    signatures: string[];
+    message?: { accountKeys?: ({ pubkey: { toString(): string } | string } | string)[] };
+  };
 }
 
 function amountOf(b: TokenBalanceLike): number {
@@ -104,4 +111,33 @@ export function ago(time: number | null, now: number): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86_400)}d ago`;
+}
+
+const WSOL = "So11111111111111111111111111111111111111112";
+
+/**
+ * How much SOL `owner` really traded in this transaction, signed (negative =
+ * spent), in SOL. Native SOL is not a token balance, so it is read from the
+ * account's lamports, then corrected for what was not part of the trade: the
+ * network fee, and the rent parked in any token account the transaction
+ * created for the owner — on a $2 first buy that deposit alone is ~20% of the
+ * trade, and would make the entry price a lie. Null when it cannot be read.
+ */
+export function nativeSolDelta(tx: ParsedTxLike, owner: string): number | null {
+  const keys = tx.transaction.message?.accountKeys;
+  const pre = tx.meta?.preBalances;
+  const post = tx.meta?.postBalances;
+  if (!keys || !pre || !post) return null;
+  const name = (k: (typeof keys)[number]) =>
+    typeof k === "string" ? k : typeof k.pubkey === "string" ? k.pubkey : k.pubkey.toString();
+  const i = keys.findIndex((k) => name(k) === owner);
+  if (i < 0 || pre[i] === undefined || post[i] === undefined) return null;
+  let lamports = post[i] - pre[i];
+  if (i === 0) lamports += tx.meta?.fee ?? 0; // the fee payer is always the first key
+  const existed = new Set((tx.meta?.preTokenBalances ?? []).map((b) => b.accountIndex));
+  for (const b of tx.meta?.postTokenBalances ?? []) {
+    if (b.owner !== owner || b.mint === WSOL || b.accountIndex === undefined || existed.has(b.accountIndex)) continue;
+    lamports += post[b.accountIndex] ?? 0; // rent deposit for a newly created account
+  }
+  return lamports / 1e9;
 }

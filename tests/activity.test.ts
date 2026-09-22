@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, classify, type ParsedTxLike } from "@/lib/activity";
+import { ago, classify, nativeSolDelta, type ParsedTxLike } from "@/lib/activity";
 
 const OWNER = "Owner1111111111111111111111111111111111111";
 const OTHER = "Other1111111111111111111111111111111111111";
@@ -71,5 +71,39 @@ describe("ago", () => {
     expect(ago(1000, 1000 + 3 * 3600)).toBe("3h ago");
     expect(ago(1000, 1000 + 2 * 86_400)).toBe("2d ago");
     expect(ago(null, 1)).toBe("");
+  });
+});
+
+describe("nativeSolDelta", () => {
+  const owner = "Owner111111111111111111111111111111111111111";
+  const tx = (over: Partial<NonNullable<import("@/lib/activity").ParsedTxLike["meta"]>> = {}) => ({
+    blockTime: 1,
+    transaction: { signatures: ["s"], message: { accountKeys: [{ pubkey: owner }, { pubkey: "pool" }, { pubkey: "newAta" }] } },
+    meta: {
+      err: null,
+      fee: 5_000,
+      preBalances: [1_000_000_000, 0, 0],
+      // Spent 0.02 SOL on the swap, 5,000 lamports fee, 2,100,000 lamports rent for a new token account.
+      postBalances: [1_000_000_000 - 20_000_000 - 5_000 - 2_100_000, 0, 2_100_000],
+      preTokenBalances: [],
+      postTokenBalances: [{ accountIndex: 2, mint: "xstock", owner, uiTokenAmount: { uiAmount: 0.013 } }],
+      ...over,
+    },
+  });
+
+  it("excludes the fee and a new account's rent from what was traded", () => {
+    expect(nativeSolDelta(tx(), owner)).toBeCloseTo(-0.02, 9);
+  });
+
+  it("does not treat an account that already existed as new rent", () => {
+    const t = tx({
+      preTokenBalances: [{ accountIndex: 2, mint: "xstock", owner, uiTokenAmount: { uiAmount: 0 } }],
+      postBalances: [1_000_000_000 - 20_000_000 - 5_000, 0, 2_100_000],
+    });
+    expect(nativeSolDelta(t, owner)).toBeCloseTo(-0.02, 9);
+  });
+
+  it("is null when the owner is not in the transaction", () => {
+    expect(nativeSolDelta(tx(), "someoneElse")).toBeNull();
   });
 });

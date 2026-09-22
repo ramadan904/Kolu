@@ -71,3 +71,16 @@ export function fmtAmount(amount: number): string {
   const dp = amount < 1 ? 6 : amount < 1000 ? 4 : 2;
   return amount.toLocaleString("en-US", { maximumFractionDigits: dp });
 }
+
+/** Native SOL, as Jupiter and the wrapped-SOL token account both name it. */
+export const SOL_MINT = "So11111111111111111111111111111111111111112";
+export const SOL_DECIMALS = 9;
+/**
+ * SOL kept back when paying in SOL: network and priority fees, plus rent for
+ * the token account a first buy of an xStock creates (~0.0021 SOL, refunded if
+ * the account is ever closed). Spending past this can leave a swap unable to
+ * land.
+ */
+export const SOL_RESERVE = 0.01;
+/** Rent deposit for a new Token-2022 account, SOL. Shown before a first buy. */
+export const TOKEN_ACCOUNT_RENT_SOL = 0.0021;

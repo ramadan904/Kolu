@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import type { BasisReading } from "@/lib/basis/compute";
@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge, Dot } from "@/components/ui/Badge";
 import { fmtBps, fmtUsd } from "@/lib/format";
-import { fmtAmount } from "@/lib/tokens";
+import { fmtAmount, SOL_MINT, SOL_RESERVE, TOKEN_ACCOUNT_RENT_SOL } from "@/lib/tokens";
 import { describeTradeError, fromBaseUnits, jupiterOutAmount } from "@/lib/trade";
 import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 import { pollConfirmation } from "@/lib/confirm";
@@ -49,15 +49,25 @@ interface Quote {
   outAmount?: string;
   minOutAmount?: string | null;
   outDecimals?: number;
+  inAmount?: string;
+  inDecimals?: number;
+  /** The other leg: USDC, or native SOL. */
+  pay?: PayAsset;
+  /** USD per unit of the pay asset. */
+  payPriceUsd?: number;
   quote?: unknown;
 }
+
+type PayAsset = "USDC" | "SOL";
+/** Below this much SOL, a swap cannot pay its own network fee. */
+const MIN_FEE_SOL = 0.002;
 
 type TxState =
   | { kind: "idle" }
   | { kind: "building" }
   | { kind: "signing" }
   | { kind: "sending"; signature?: string; since?: number }
-  | { kind: "done"; signature: string; side: Side; spent: number; received: number | null }
+  | { kind: "done"; signature: string; side: Side; spent: number; received: number | null; asset: PayAsset }
   /** Sent, but the chain has not said either way. Must not be retried blindly. */
   | { kind: "unconfirmed"; signature: string }
   | { kind: "error"; message: string; signature?: string; stage: Stage };
@@ -86,6 +96,7 @@ async function fetchQuote(p: {
   side: Side;
   price: number;
   slippageBps: number;
+  pay: PayAsset;
 }): Promise<Quote> {
   const params = new URLSearchParams({
     ticker: p.ticker,
@@ -93,6 +104,7 @@ async function fetchQuote(p: {
     side: p.side,
     price: String(p.price),
     slippageBps: String(p.slippageBps),
+    pay: p.pay,
   });
   const res = await fetch(`/api/quote?${params}`, { cache: "no-store" });
   return (await res.json()) as Quote;
@@ -175,16 +187,40 @@ export function TradePanel({
   const quoteMint = mints?.quote?.mint;
   const tokenHeld = tokenMint ? (balances.get(tokenMint)?.amount ?? 0) : 0;
   const usdcHeld = quoteMint ? (balances.get(quoteMint)?.amount ?? 0) : 0;
+  const solHeld = balances.get(SOL_MINT)?.amount ?? 0;
+  // SOL is spendable only above the reserve that pays the swap's own fees.
+  const solSpendable = Math.max(0, solHeld - SOL_RESERVE);
+
+  // Pay (or receive) in USDC or native SOL. Chosen for the wallet once its
+  // balances are known — a wallet with SOL and no USDC should not have to find
+  // the switch — and never changed again after the person picks one.
+  const [payAsset, setPayAsset] = useState<PayAsset>("USDC");
+  const payPicked = useRef(false);
+  const [solPrice, setSolPrice] = useState<number | null>(null);
 
   // What this trade would actually cost, in the asset being spent.
-  const needed = side === "sell" ? tokens : notional;
-  const held = side === "sell" ? tokenHeld : usdcHeld;
-  const payUnit = side === "sell" ? reading.tokenTicker : "USDC";
+  const needed =
+    side === "sell" ? tokens : payAsset === "SOL" ? (solPrice ? notional / solPrice : 0) : notional;
+  const held = side === "sell" ? tokenHeld : payAsset === "SOL" ? solSpendable : usdcHeld;
+  const payUnit = side === "sell" ? reading.tokenTicker : payAsset;
   const balancesKnown = connected && !loadingBalances && !balanceError;
   // Only claim a shortfall once balances have actually been read.
   const shortfall = balancesKnown && sizeValid && held < needed * 0.9999;
+  // Every swap pays its network fee in SOL, whatever it trades.
+  const feeShortfall = balancesKnown && solHeld < MIN_FEE_SOL;
+  // A first buy creates the token's account, which holds a small rent deposit.
+  const needsAccount = balancesKnown && side === "buy" && !!tokenMint && !balances.has(tokenMint);
 
   const busy = tx.kind === "building" || tx.kind === "signing" || tx.kind === "sending";
+
+  useEffect(() => {
+    if (payPicked.current || !balancesKnown) return;
+    if (usdcHeld < MIN_NOTIONAL_USD && solSpendable > 0) setPayAsset("SOL");
+  }, [balancesKnown, usdcHeld, solSpendable]);
+  const pickPay = (next: PayAsset) => {
+    payPicked.current = true;
+    setPayAsset(next);
+  };
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), REQUOTE_MS);
@@ -204,7 +240,12 @@ export function TradePanel({
   useEffect(() => {
     setQuote(null);
     setLadder({});
-  }, [side]);
+  }, [side, payAsset]);
+
+  // SOL's price rides along with every SOL quote.
+  useEffect(() => {
+    if (quote?.available && quote.pay === "SOL" && quote.payPriceUsd) setSolPrice(quote.payPriceUsd);
+  }, [quote]);
 
   // The live quote for the exact size entered.
   useEffect(() => {
@@ -225,6 +266,7 @@ export function TradePanel({
             side,
             price: tokenPrice,
             slippageBps,
+            pay: payAsset,
           });
           if (!cancelled) {
             setQuote(body);
@@ -244,7 +286,7 @@ export function TradePanel({
     // `busy` is deliberately absent: a re-quote landing mid-signature would
     // change the numbers on screen under a transaction already built.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reading.ticker, tokenPrice, notional, side, slippageBps, sizeValid, tick]);
+  }, [reading.ticker, tokenPrice, notional, side, slippageBps, sizeValid, tick, payAsset]);
 
   // Measured impact at each preset size, so the ladder shows where the trade
   // stops paying rather than asking someone to discover it one size at a time.
@@ -257,7 +299,7 @@ export function TradePanel({
           try {
             return [
               size,
-              await fetchQuote({ ticker: reading.ticker, notional: size, side, price: tokenPrice, slippageBps }),
+              await fetchQuote({ ticker: reading.ticker, notional: size, side, price: tokenPrice, slippageBps, pay: payAsset }),
             ] as const;
           } catch {
             return [size, { available: false } as Quote] as const;
@@ -272,7 +314,7 @@ export function TradePanel({
     // Re-quoted on the slow tick, not every oracle poll: four quotes per price
     // update would be most of the Jupiter budget for one open ticket.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reading.ticker, side, slippageBps, tick, tokenPrice > 0]);
+  }, [reading.ticker, side, slippageBps, tick, tokenPrice > 0, payAsset]);
 
   const edgeAt = useCallback(
     (size: number, impactBps: number): EdgeResult | null =>
@@ -301,7 +343,7 @@ export function TradePanel({
   const minReceived = quote?.available
     ? fromBaseUnits(quote.minOutAmount ?? undefined, quote.outDecimals)
     : null;
-  const receiveUnit = side === "buy" ? reading.tokenTicker : "USDC";
+  const receiveUnit = side === "buy" ? reading.tokenTicker : payAsset;
 
   const setSize = (usd: number, floor = false) =>
     setInput(toInput(unit === "usd" ? usd : usd / tokenPrice, unit, floor));
@@ -318,12 +360,12 @@ export function TradePanel({
   // real swap and the dry run, so the dry run proves the path a trade takes.
   const freshQuote = useCallback(async (): Promise<Quote> => {
     if (quote?.available && quote.quote && Date.now() - quotedAt <= QUOTE_TTL_MS) return quote;
-    const live = await fetchQuote({ ticker: reading.ticker, notional, side, price: tokenPrice, slippageBps });
+    const live = await fetchQuote({ ticker: reading.ticker, notional, side, price: tokenPrice, slippageBps, pay: payAsset });
     setQuote(live);
     setQuotedAt(Date.now());
     if (!live.available || !live.quote) throw new Error("No route");
     return live;
-  }, [quote, quotedAt, reading.ticker, notional, side, tokenPrice, slippageBps]);
+  }, [quote, quotedAt, reading.ticker, notional, side, tokenPrice, slippageBps, payAsset]);
 
   const buildSwap = useCallback(async (live: Quote, owner: string) => {
     const res = await fetch("/api/swap", {
@@ -420,11 +462,17 @@ export function TradePanel({
         side,
         spent,
         received: fromBaseUnits(live.outAmount, live.outDecimals),
+        asset: payAsset,
+        // What left the wallet, in its own unit: the quote's exact input.
+        ...(side === "buy" && live.inAmount ? { spent: fromBaseUnits(live.inAmount, live.inDecimals) ?? spent } : {}),
       });
       requestBalancesRefresh();
       // The entry price for P&L, read back from what actually moved.
       if (tokenMint && quoteMint) {
-        void recordFill(connection, signature, publicKey.toBase58(), reading.ticker, tokenMint, quoteMint);
+        void recordFill(connection, signature, publicKey.toBase58(), reading.ticker, tokenMint,
+          payAsset === "SOL"
+            ? { mint: SOL_MINT, priceUsd: live.payPriceUsd ?? solPrice ?? 0 }
+            : { mint: quoteMint, priceUsd: 1 });
       }
     } catch (err) {
       setTx({ kind: "error", message: describeTradeError(err, { slippageBps, payUnit }), signature, stage });
@@ -446,9 +494,12 @@ export function TradePanel({
     tokenMint,
     quoteMint,
     reading.ticker,
+    payAsset,
+    solPrice,
   ]);
 
-  const canSwap = connected && sizeValid && quote?.available === true && !busy && !shortfall;
+  const canSwap =
+    connected && sizeValid && quote?.available === true && !busy && !shortfall && !feeShortfall;
   const netColor = !edge
     ? "var(--text-3)"
     : edge.tone === "good"
@@ -464,6 +515,8 @@ export function TradePanel({
     ? "Enter a size"
     : shortfall
       ? `Not enough ${payUnit}`
+      : feeShortfall
+        ? "Needs a little SOL for fees"
       : tx.kind === "building"
         ? "Preparing swap"
         : tx.kind === "signing"
@@ -688,7 +741,16 @@ export function TradePanel({
             {balancesKnown && (
               <button
                 type="button"
-                onClick={() => setSize(side === "sell" ? tokenHeld * tokenPrice : usdcHeld, true)}
+                onClick={() =>
+                  setSize(
+                    side === "sell"
+                      ? tokenHeld * tokenPrice
+                      : payAsset === "SOL"
+                        ? solSpendable * (solPrice ?? 0)
+                        : usdcHeld,
+                    true,
+                  )
+                }
                 className="text-[12px] text-[var(--text-3)] transition-colors hover:text-white"
                 title="Use the full balance"
               >
@@ -735,6 +797,34 @@ export function TradePanel({
               ))}
             </div>
           </div>
+
+          {/* The other leg of the swap. Limit orders stay in USDC. */}
+          {mode === "now" && !demo && (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+                {side === "sell" ? "Receive in" : "Pay with"}
+              </span>
+              <div className="flex rounded-[8px] border border-white/10 bg-black/30 p-0.5" role="group" aria-label={side === "sell" ? "Receive in" : "Pay with"}>
+                {(["USDC", "SOL"] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => pickPay(a)}
+                    aria-pressed={payAsset === a}
+                    disabled={busy}
+                    className={`flex items-center gap-1.5 rounded-[6px] px-3 py-1 text-[12px] font-medium transition-colors ${
+                      payAsset === a ? "bg-white/[0.09] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                    }`}
+                  >
+                    {a}
+                    {balancesKnown && (
+                      <span className="num font-normal text-[var(--text-3)]">{fmtAmount(a === "SOL" ? solHeld : usdcHeld)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {mode === "now" && (
           <>
@@ -968,7 +1058,21 @@ export function TradePanel({
             {shortfall && (
               <p className="mb-3 text-[12px] leading-relaxed text-[var(--warn)]">
                 This trade needs <span className="num">{fmtAmount(needed)}</span> {payUnit}; the
-                wallet holds <span className="num">{fmtAmount(held)}</span>.
+                wallet {payUnit === "SOL" ? "can spend" : "holds"} <span className="num">{fmtAmount(held)}</span>
+                {payUnit === "SOL" && <> (keeping {SOL_RESERVE} SOL back for fees)</>}.
+              </p>
+            )}
+            {feeShortfall && (
+              <p className="mb-3 text-[12px] leading-relaxed text-[var(--warn)]">
+                Every Solana transaction pays its fee in SOL, and this wallet has{" "}
+                <span className="num">{fmtAmount(solHeld)}</span>. Add about 0.01 SOL to trade.
+              </p>
+            )}
+            {needsAccount && !shortfall && !feeShortfall && sizeValid && (
+              <p className="mb-3 text-[12px] leading-relaxed text-[var(--text-3)]">
+                First {reading.tokenTicker} in this wallet: the swap also opens its token account, which holds
+                about {TOKEN_ACCOUNT_RENT_SOL} SOL of rent (refundable if the account is closed). It is not
+                counted in your entry price.
               </p>
             )}
 
@@ -1105,12 +1209,12 @@ function FilledCard({
         {tx.side === "buy" ? (
           <>
             Bought {tx.received !== null ? `≈ ${fmtAmount(tx.received)}` : ""} {tokenTicker} for{" "}
-            {fmtAmount(tx.spent)} USDC.
+            {fmtAmount(tx.spent)} {tx.asset}.
           </>
         ) : (
           <>
             Sold {fmtAmount(tx.spent)} {tokenTicker} for{" "}
-            {tx.received !== null ? `≈ ${fmtAmount(tx.received)}` : ""} USDC.
+            {tx.received !== null ? `≈ ${fmtAmount(tx.received)}` : ""} {tx.asset}.
           </>
         )}{" "}
         <span className="text-[var(--text-3)]">Exact fill on Solscan.</span>
