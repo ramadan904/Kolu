@@ -66,7 +66,7 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
                 <button
                   type="button"
                   onClick={() => onSelect(r.ticker)}
-                  className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 border-b border-[var(--border)] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--raised)] sm:grid-cols-[120px_1fr_150px_minmax(280px,auto)] sm:px-5"
+                  className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 border-b border-[var(--border)] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--raised)] sm:grid-cols-[120px_1fr_150px_340px] sm:px-5"
                 >
                   <span>
                     <span className="text-[14px] font-medium">{r.tokenTicker}</span>
