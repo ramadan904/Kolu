@@ -116,7 +116,7 @@ run*. "That's the exact Jupiter transaction, built and simulated on mainnet —
 it delivers this many tokens right now. Nothing signed, nothing sent." The step
 tracker shows Quote → Build → Simulate → Sign (needs a wallet).
 
-**1:35 — Your position.** Click *see a live example*. "A public exchange wallet
+**1:35 — Portfolio.** Open *Portfolio*, click *see a live example*. "A public exchange wallet
 — sixteen million dollars of real xStocks, valued against the live gaps, with
 what each would gain or lose if its gap closed, and its latest xStock activity
 read from chain." Point at the rings on the map. "Connect your own wallet and
@@ -188,7 +188,7 @@ so a leftover placeholder is dropped rather than handed to a router.
 
 - **Live:** https://kolu-ramrex904-5914.vercel.app
 - **Straight to it:** [replay a dislocation](https://kolu-ramrex904-5914.vercel.app/?replay=1) ·
-  [a live portfolio](https://kolu-ramrex904-5914.vercel.app/?view=example) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
+  [a live portfolio](https://kolu-ramrex904-5914.vercel.app/portfolio?view=example) · [gap history](https://kolu-ramrex904-5914.vercel.app/history) · [the backtest](https://kolu-ramrex904-5914.vercel.app/backtest) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
 - **Health:** https://kolu-ramrex904-5914.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu
 - **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC for the board; set `SOLANA_RPC_URL` to trade

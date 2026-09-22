@@ -203,7 +203,7 @@ export function GapHistory({
         </dl>
       </div>
 
-      {!real && series && (
+      {!real && series && series.ticker === active && !loading && (
         <p className="mt-3 text-[12px] text-[var(--text-3)]">
           {demo
             ? "Replay: this shape is modelled."

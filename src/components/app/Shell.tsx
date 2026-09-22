@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
+import { TopNav } from "./TopNav";
 import { WalletButton } from "./WalletButton";
 
 function Mark() {
@@ -28,12 +30,20 @@ export function Shell({
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Mark />
+          <Link href="/" aria-label="Kolu, board">
+            <Mark />
+          </Link>
           <div className="hidden flex-1 sm:block">{nav}</div>
           <div className="flex flex-1 items-center justify-end gap-3 sm:flex-none">
             <WalletButton />
           </div>
         </div>
+        {/* Phones: the four pages as a tab row under the bar. */}
+        {nav && (
+          <div className="border-t border-[var(--border)] px-2 py-1.5 sm:hidden">
+            <TopNav compact />
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-8">{children}</main>
@@ -50,10 +60,12 @@ export function Shell({
           <FooterCol
             title="Product"
             links={[
-              ["Live board", "/"],
+              ["Board", "/"],
+              ["Portfolio", "/portfolio"],
+              ["Gap history", "/history"],
+              ["Backtest", "/backtest"],
               ["Replay a dislocation", "/?replay=1"],
-              ["A live portfolio", "/?view=example"],
-              ["TSLAX ticket", "/?trade=TSLA"],
+              ["A live portfolio", "/portfolio?view=example"],
             ]}
           />
           <FooterCol
@@ -94,14 +106,21 @@ function FooterCol({ title, links }: { title: string; links: [string, string][] 
           const external = href.startsWith("http");
           return (
             <li key={label}>
-              <a
-                href={href}
-                {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
-                className="text-[var(--text-2)] transition-colors hover:text-white"
-              >
-                {label}
-                {external && " ↗"}
-              </a>
+              {external || href.startsWith("/api") ? (
+                <a
+                  href={href}
+                  {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+                  className="text-[var(--text-2)] transition-colors hover:text-white"
+                >
+                  {label}
+                  {external && " ↗"}
+                </a>
+              ) : (
+                // In-app pages keep the board's state (prices, a replay, a watched address).
+                <Link href={href} className="text-[var(--text-2)] transition-colors hover:text-white">
+                  {label}
+                </Link>
+              )}
             </li>
           );
         })}

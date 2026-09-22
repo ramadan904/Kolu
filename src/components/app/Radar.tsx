@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BoardSnapshot } from "@/lib/board";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { viewFor } from "./TopNav";
 import type { HistorySeries } from "@/lib/history";
 import {
   evaluate,
@@ -28,7 +31,7 @@ import { GapHistory } from "./GapHistory";
 import { RecentDislocations } from "./RecentDislocations";
 import { HowItReads } from "./HowItReads";
 import { OpenConvergence } from "./OpenConvergence";
-import { Backtest } from "./Backtest";
+import { Backtest, BacktestMethod } from "./Backtest";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
@@ -41,7 +44,26 @@ import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 
 const POLL_MS = 10_000;
 
+/** Scrolls to an element once the page that holds it has rendered. */
+function scrollWhenReady(id: string, block: ScrollLogicalPosition = "start") {
+  const until = Date.now() + 3000;
+  const tick = () => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block });
+    else if (Date.now() < until) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 export function Radar({ initial }: { initial: BoardSnapshot }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const view = viewFor(pathname);
+  /** To a page (and a section on it), keeping every piece of board state. */
+  const go = (path: string, id?: string) => {
+    if (viewFor(path) !== view) router.push(path, { scroll: !id });
+    if (id) scrollWhenReady(id);
+  };
   const [board, setBoard] = useState(initial);
   const [tier, setTier] = useState<"core" | "all">("core");
   // A replayed dislocation, requested from the page. Null = live prices.
@@ -53,7 +75,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const showHistory = (ticker: string, days?: 2 | 7) => {
     setChartTicker(ticker);
     if (days) setChartDays(days);
-    document.getElementById("gap-history")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (view !== "history") router.push("/history", { scroll: false });
+    scrollWhenReady("gap-history", "center");
   };
   const [selected, setSelected] = useState<string | null>(null);
   // Set only when a holding asks for a specific side; otherwise the ticket
@@ -208,7 +231,11 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("replay") === "1") setDemo("live_dislocation");
-    if (params.get("view") === "example") watch(EXAMPLE_WALLET.address);
+    if (params.get("view") === "example") {
+      watch(EXAMPLE_WALLET.address);
+      // Older links opened the example on the one-page board; it lives on Portfolio now.
+      if (view !== "portfolio") router.replace("/portfolio?view=example");
+    }
     const ticker = params.get("trade");
     const entry = ticker ? findEntry(ticker) : undefined;
     if (entry) {
@@ -229,13 +256,13 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       if (tradeSide) params.set("side", tradeSide);
     }
     if (demo) params.set("replay", "1");
-    if (watching && owner === EXAMPLE_WALLET.address) params.set("view", "example");
+    if (view === "portfolio" && watching && owner === EXAMPLE_WALLET.address) params.set("view", "example");
     const query = params.toString();
     const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     if (next !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, "", next);
     }
-  }, [selected, tradeSide, demo, watching, owner]);
+  }, [selected, tradeSide, demo, watching, owner, view]);
   const held = useMemo(() => {
     const out = new Set<string>();
     if (!mints) return out;
@@ -284,8 +311,6 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
   // Everything on the page, one search away (⌘K or /).
   const commands = useMemo<Command[]>(() => {
-    const scrollTo = (id: string) => () =>
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     const pairs: Command[] = UNIVERSE.flatMap((entry) => {
       const r = board.readings.find((x) => x.ticker === entry.ticker);
       const gap = r?.basisBps ?? null;
@@ -315,13 +340,14 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       ];
     });
     const goto: Command[] = [
-      { id: "go-position", group: "Go to", label: "Your position", keywords: "portfolio holdings wallet pnl", run: scrollTo("position") },
-      { id: "go-history", group: "Go to", label: "Gap history", keywords: "chart 48h 7d", run: scrollTo("gap-history") },
-      { id: "go-pairs", group: "Go to", label: "All tracked pairs", keywords: "table board", run: scrollTo("pairs") },
-      { id: "go-dislocations", group: "Go to", label: "Recent dislocations", keywords: "widest movers", run: scrollTo("recent-dislocations") },
-      { id: "go-open", group: "Go to", label: "Does the gap close at the open?", keywords: "convergence thesis", run: scrollTo("open-convergence") },
-      { id: "go-backtest", group: "Go to", label: "Backtest · would trading the gap have paid?", keywords: "strategy simulate threshold", run: scrollTo("backtest") },
-      { id: "go-how", group: "Go to", label: "How Kolu reads a gap", keywords: "noise floor hedge breakeven explain", run: scrollTo("how-it-reads") },
+      { id: "go-board", group: "Go to", label: "Board", hint: "page", keywords: "home live market map", run: () => go("/") },
+      { id: "go-position", group: "Go to", label: "Portfolio", hint: "page", keywords: "position holdings wallet pnl orders activity", run: () => go("/portfolio") },
+      { id: "go-history", group: "Go to", label: "History", hint: "page", keywords: "gap chart 48h 7d", run: () => go("/history") },
+      { id: "go-backtest", group: "Go to", label: "Backtest", hint: "page", keywords: "would it have paid strategy simulate threshold", run: () => go("/backtest") },
+      { id: "go-pairs", group: "Go to", label: "All tracked pairs", keywords: "table board", run: () => go("/", "pairs") },
+      { id: "go-dislocations", group: "Go to", label: "Recent dislocations", keywords: "widest movers", run: () => go("/history", "recent-dislocations") },
+      { id: "go-open", group: "Go to", label: "Does the gap close at the open?", keywords: "convergence thesis", run: () => go("/history", "open-convergence") },
+      { id: "go-how", group: "Go to", label: "How Kolu reads a gap", keywords: "noise floor hedge breakeven explain", run: () => go("/", "how-it-reads") },
     ];
     const actions: Command[] = [
       demo
@@ -335,7 +361,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         run: () => {
           setDemo(null);
           watch(EXAMPLE_WALLET.address);
-          requestAnimationFrame(scrollTo("position"));
+          go("/portfolio");
         },
       },
       tier === "all"
@@ -361,7 +387,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return [...pairs, ...goto, ...actions];
     // showHistory is recreated each render but only closes over setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board.readings, demo, tier, breakeven, armBreakeven, openTrade, watch]);
+  }, [board.readings, demo, tier, breakeven, armBreakeven, openTrade, watch, view]);
 
   return (
     <div>
@@ -421,53 +447,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       )}
 
-      <FirstVisit
-        onReplay={() => {
-          setSelected(null);
-          setDemo("live_dislocation");
-        }}
-        onExample={() => {
-          setDemo(null);
-          watch(EXAMPLE_WALLET.address);
-        }}
-        onTicket={() => {
-          setDemo(null);
-          const target = headline?.ticker ?? board.readings[0]?.ticker;
-          if (target) openTrade(target);
-        }}
-      />
-
-      <div className="mt-4 scroll-mt-4" id="position" />
-      <ErrorBoundary name="Your position">
-      <Portfolio
-        readings={board.readings}
-        mints={mints}
-        onTrade={openTrade}
-        onShowAll={tier === "all" ? undefined : () => setTier("all")}
-        demo={demo !== null}
-      />
-      </ErrorBoundary>
-
-      <ErrorBoundary name="The headline">
-      <Hero
-        reading={headline}
-        hedgeable={hedgeable}
-        session={board.session}
-        delayed={delayed}
-        onTrade={(t) => openTrade(t)}
-        breakevenBps={breakeven}
-        armedAtBreakeven={armedAtBreakeven}
-        pairs={board.readings.length}
-        onArmBreakeven={demo ? undefined : armBreakeven}
-        onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
-      />
-      </ErrorBoundary>
-
-      <ArmedStrip
-        rules={rules}
-        visibleTickers={board.readings.map((r) => r.ticker)}
-        onRemove={removeRule}
-      />
+      {view !== "board" && <PageHead view={view} />}
 
       {fired.length > 0 && (
         <div className="mb-5 space-y-1.5">
@@ -494,6 +474,47 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       )}
 
+
+      {view === "board" && (
+        <>
+      <FirstVisit
+        onReplay={() => {
+          setSelected(null);
+          setDemo("live_dislocation");
+        }}
+        onExample={() => {
+          setDemo(null);
+          watch(EXAMPLE_WALLET.address);
+          go("/portfolio");
+        }}
+        onTicket={() => {
+          setDemo(null);
+          const target = headline?.ticker ?? board.readings[0]?.ticker;
+          if (target) openTrade(target);
+        }}
+      />
+
+      <ErrorBoundary name="The headline">
+      <Hero
+        reading={headline}
+        hedgeable={hedgeable}
+        session={board.session}
+        delayed={delayed}
+        onTrade={(t) => openTrade(t)}
+        breakevenBps={breakeven}
+        armedAtBreakeven={armedAtBreakeven}
+        pairs={board.readings.length}
+        onArmBreakeven={demo ? undefined : armBreakeven}
+        onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
+      />
+      </ErrorBoundary>
+
+      <ArmedStrip
+        rules={rules}
+        visibleTickers={board.readings.map((r) => r.ticker)}
+        onRemove={removeRule}
+      />
+
       <ErrorBoundary name="The market map">
       <MarketMap
         readings={board.readings}
@@ -502,18 +523,6 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         heldIn={watching ? "the watched address" : "your wallet"}
         selected={selected}
       />
-      </ErrorBoundary>
-
-      <ErrorBoundary name="Gap history">
-        <GapHistory
-          readings={board.readings}
-          ticker={chartTicker ?? headline?.ticker ?? null}
-          onTicker={setChartTicker}
-          days={chartDays}
-          onDays={setChartDays}
-          onTrade={(t) => openTrade(t)}
-          demo={demo !== null}
-        />
       </ErrorBoundary>
 
       <div id="pairs" className="mb-3 flex scroll-mt-4 items-center justify-between">
@@ -552,8 +561,51 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       />
       </ErrorBoundary>
 
+
       <div className="mt-5" />
-      {!demo && (
+      <ErrorBoundary name="How Kolu reads a gap">
+        <HowItReads readings={board.readings} session={board.session} hedgeable={hedgeable} />
+      </ErrorBoundary>
+
+      <Explore />
+        </>
+      )}
+
+      {view === "portfolio" && (
+        <>
+      <div className="scroll-mt-4" id="position" />
+      <ErrorBoundary name="Your position">
+      <Portfolio
+        readings={board.readings}
+        mints={mints}
+        onTrade={openTrade}
+        onShowAll={tier === "all" ? undefined : () => setTier("all")}
+        demo={demo !== null}
+      />
+      </ErrorBoundary>
+
+
+        </>
+      )}
+
+      {view === "history" && (
+        <>
+      <ErrorBoundary name="Gap history">
+        <GapHistory
+          readings={board.readings}
+          ticker={chartTicker ?? headline?.ticker ?? null}
+          onTicker={setChartTicker}
+          days={chartDays}
+          onDays={setChartDays}
+          onTrade={(t) => openTrade(t)}
+          demo={demo !== null}
+        />
+      </ErrorBoundary>
+
+
+      {demo ? (
+        <DemoNote what="Recent dislocations and the open-by-open record" onLive={() => { setSelected(null); setDemo(null); }} />
+      ) : (
         <>
           <ErrorBoundary name="Recent dislocations">
             <RecentDislocations onSelect={showHistory} />
@@ -561,15 +613,23 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           <ErrorBoundary name="Open convergence">
             <OpenConvergence onSelect={(t) => showHistory(t, 7)} />
           </ErrorBoundary>
-          <ErrorBoundary name="Backtest">
-            <Backtest onTrade={(t) => openTrade(t)} />
-          </ErrorBoundary>
+        </>
+      )}
         </>
       )}
 
-      <ErrorBoundary name="How Kolu reads a gap">
-        <HowItReads readings={board.readings} session={board.session} hedgeable={hedgeable} />
-      </ErrorBoundary>
+      {view === "backtest" && (
+        demo ? (
+          <DemoNote what="The backtest" onLive={() => { setSelected(null); setDemo(null); }} />
+        ) : (
+          <>
+            <ErrorBoundary name="Backtest">
+              <Backtest onTrade={(t) => openTrade(t)} />
+            </ErrorBoundary>
+            <BacktestMethod />
+          </>
+        )
+      )}
 
       {detail && (
         <ErrorBoundary
@@ -610,5 +670,73 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </ErrorBoundary>
       )}
     </div>
+  );
+}
+
+const HEADS = {
+  portfolio: [
+    "Portfolio",
+    "Your xStocks valued against the live gaps: P&L, what closing each gap is worth, open limit orders and recent activity.",
+  ],
+  history: [
+    "Gap history",
+    "How far each xStock traded from its real share, from real on-chain trades — and whether the gap closed when the market opened.",
+  ],
+  backtest: [
+    "Backtest",
+    "Would trading the gap have paid? Set a rule; last week's real trades answer, after costs.",
+  ],
+} as const;
+
+function PageHead({ view }: { view: keyof typeof HEADS }) {
+  const [title, sub] = HEADS[view];
+  return (
+    <div className="mt-6 mb-6">
+      <h1 className="display text-[28px] leading-tight tracking-[-0.02em]">{title}</h1>
+      <p className="mt-1.5 max-w-[640px] text-[14px] leading-relaxed text-[var(--text-2)]">{sub}</p>
+    </div>
+  );
+}
+
+/** Modelled prices never feed real history or real holdings; say so, and offer the way back. */
+function DemoNote({ what, onLive }: { what: string; onLive: () => void }) {
+  return (
+    <div className="panel mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 text-[13px] sm:px-5">
+      <p className="text-[var(--text-2)]">{what} run on real trades only, so they are off while the replay runs.</p>
+      <button
+        type="button"
+        onClick={onLive}
+        className="h-8 rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-3 text-[12px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--raised)] hover:text-white"
+      >
+        Back to live prices
+      </button>
+    </div>
+  );
+}
+
+const EXPLORE = [
+  ["/portfolio", "Portfolio", "Your xStocks against the live gaps, with P&L — or watch any address."],
+  ["/history", "History", "A week of real gaps per pair, and whether they closed at the open."],
+  ["/backtest", "Backtest", "Would trading the gap have paid? Set a rule, see last week's answer."],
+] as const;
+
+/** Where to go from the board: the other three pages, each with the question it answers. */
+function Explore() {
+  return (
+    <nav aria-label="More" className="mt-2 mb-2 grid gap-3 md:grid-cols-3">
+      {EXPLORE.map(([href, title, line]) => (
+        <Link
+          key={href}
+          href={href}
+          className="panel group block px-4 py-3.5 transition-colors hover:border-[var(--border-strong)] sm:px-5"
+        >
+          <span className="flex items-center justify-between text-[14px] font-medium text-white">
+            {title}
+            <span className="text-[var(--text-3)] transition-transform group-hover:translate-x-0.5">→</span>
+          </span>
+          <span className="mt-1 block text-[13px] leading-relaxed text-[var(--text-3)]">{line}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }

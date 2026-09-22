@@ -11,6 +11,12 @@ Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
 
 **[Open the live board](https://kolu-ramrex904-5914.vercel.app)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
 
+**Four pages, one live board.** *Board* is the market now (the headline gap,
+the map, every pair, alerts). *Portfolio* is your holdings, P&L, orders and
+activity. *History* is a week of real gaps and whether they closed at the open.
+*Backtest* asks whether trading them would have paid. Prices, an open ticket,
+the replay and a watched address carry across all four; ⌘K reaches everything.
+
 ---
 
 ## Judge path — 90 seconds
@@ -39,7 +45,7 @@ Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
    reads **Directional, not an arbitrage**. The chart below is the thesis:
    shaded = the underlying was shut, and the basis opens exactly then.
 
-4. **See a real portfolio without a wallet.** In *Your position*, click *see a
+4. **See a real portfolio without a wallet.** On *Portfolio*, click *see a
    live example* (a public exchange wallet) or paste any Solana address, and its
    actual xStock holdings are valued against the live gaps,
    read-only, with what each would gain or lose if its gap closed. Rings on the
@@ -136,7 +142,7 @@ wider than the edge itself. A default 0.5% slippage quietly eating most of an
 83bps gap is the exact failure this product exists to prevent.
 
 **Positions against the gap.** Connect a wallet — or paste any address to view
-it read-only — and *Your position* values every xStock held (both token
+it read-only — and *Portfolio* values every xStock held (both token
 programs, since xStocks are Token-2022 and USDC is not) against the live gaps:
 quantity, value, gap, and what each holding gains or loses if the token
 converges to the real share. Holdings outside the table's filter are listed,
@@ -154,7 +160,7 @@ browser; watched addresses never get P&L.
 Kolu turns the gap target into a real Jupiter limit order, held and filled
 on-chain while nobody is watching — Kolu can be closed. The limit is fixed from
 the real share's price at placement, and the ticket says so: if the share
-moves, the order does not follow. Open orders are listed under *Your position*
+moves, the order does not follow. Open orders are listed on *Portfolio*
 with Cancel. Without a wallet, *Dry run* builds and simulates the exact order
 transaction on mainnet.
 

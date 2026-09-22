@@ -25,7 +25,7 @@ const sizeLabel = (s: number) => (s >= 1000 ? `$${s / 1000}k` : `$${s}`);
  * already loaded, so every change is instant.
  */
 export function Backtest({ onTrade }: { onTrade: (ticker: string) => void }) {
-  const { rows, failed } = useDislocations();
+  const { rows, failed, missing } = useDislocations();
   const [threshold, setThreshold] = useState(60);
   const [size, setSize] = useState<number>(10_000);
   const [exitAfter, setExitAfter] = useState(60);
@@ -60,10 +60,16 @@ export function Backtest({ onTrade }: { onTrade: (ticker: string) => void }) {
     <section id="backtest" className="panel mb-5 overflow-hidden" aria-labelledby="backtest-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
         <h2 id="backtest-title" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-          Backtest · would trading the gap have paid?
+          Your rule, on last week's trades
         </h2>
         <span className="text-[12px] text-[var(--text-3)]">
           Last week, real trades at 30-min medians · costs modelled, {Math.round(result.costBps)}bps round trip at {sizeLabel(size)}
+          {missing > 0 && (
+            <span className="text-[var(--warn)]">
+              {" "}
+              · {pairs.length} of {pairs.length + missing} pairs — history for the rest is rate-limited, reload in a minute
+            </span>
+          )}
         </span>
       </div>
 
@@ -328,5 +334,52 @@ function Sweep({
         );
       })}
     </div>
+  );
+}
+
+const METHOD = [
+  [
+    "Entry",
+    "While the share's market is shut — overnight, weekends, holidays — the first 30-minute median gap at or beyond your threshold. Buy a cheap token; sell a rich one you hold.",
+  ],
+  [
+    "Exit",
+    "The first 30-minute median at your chosen time after the 09:30 ET open, once the share trades and the gap has had its chance to close. One trade per closure per pair.",
+  ],
+  [
+    "Costs",
+    "The same round-trip model the ticket starts from: swap fees on both legs, price impact and network cost at your size. The live ticket replaces impact with a real Jupiter quote.",
+  ],
+  [
+    "Two answers",
+    "If hedged: how far the gap itself moved, minus costs. As traded: what the token really returned, the share's own move included — the risk a closed-market trade carries.",
+  ],
+] as const;
+
+/** How the backtest decides, stated plainly enough to disagree with. */
+export function BacktestMethod() {
+  return (
+    <section className="mb-5" aria-labelledby="backtest-method">
+      <h2 id="backtest-method" className="mb-3 text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        How the backtest works
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {METHOD.map(([title, body], i) => (
+          <div key={title} className="panel px-4 py-3.5">
+            <div className="flex items-center gap-2 text-[13px] font-medium text-white">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-strong)] text-[11px] text-[var(--text-3)]">
+                {i + 1}
+              </span>
+              {title}
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-3)]">{body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[12px] text-[var(--text-3)]">
+        Real prices: the token's deepest pool (GeckoTerminal, 15-minute candles) against the share's last exchange print
+        (pre- and post-market included). A week is a small sample; past gaps are not a forecast.
+      </p>
+    </section>
   );
 }

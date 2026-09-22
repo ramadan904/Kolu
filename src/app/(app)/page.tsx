@@ -1,7 +1,4 @@
-import { Radar } from "@/components/app/Radar";
-import { Shell } from "@/components/app/Shell";
 import type { Metadata } from "next";
-import { buildBoard } from "@/lib/board";
 import { findEntry } from "@/lib/universe";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +23,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function Home() {
-  const board = await buildBoard({ tier: "core" });
-  return (
-    <Shell>
-      <Radar initial={board} />
-    </Shell>
-  );
+/** The board renders in the shared layout; this route only picks it. */
+export default function BoardPage() {
+  return null;
 }
