@@ -14,6 +14,8 @@ import { fmtAmount } from "@/lib/tokens";
 import { convergenceUsd } from "@/lib/trade";
 import { Spinner } from "@/components/ui/Button";
 import { WalletButton } from "./WalletButton";
+import { useJournal } from "./useJournal";
+import { basisFor, unrealised, type Basis } from "@/lib/journal";
 
 interface Holding {
   reading: BasisReading;
@@ -109,6 +111,11 @@ export function Portfolio({
     for (const r of readings) if (r.token) out[r.tokenTicker] = r.token.price;
     return out;
   }, [readings]);
+
+  // P&L needs an entry price, and entry prices are the owner's own record:
+  // only for a connected wallet, never a watched address.
+  const pnlOwner = !demo && !watching ? owner : null;
+  const { journal, setManual } = useJournal(pnlOwner);
 
   // Every hook above runs on every render; early returns only below this line.
   if (demo) {
@@ -212,6 +219,12 @@ export function Portfolio({
   const exposure = holdings.reduce((sum, h) => sum + (isSignal(h.reading) ? (h.convergence ?? 0) : 0), 0);
   const signalCount = holdings.filter((h) => isSignal(h.reading)).length;
   const address = owner;
+  const showPnl = pnlOwner !== null;
+  const basisOf = (h: Holding) => (showPnl ? basisFor(journal, h.reading.ticker, h.amount) : null);
+  const priced = holdings
+    .map((h) => ({ h, b: basisOf(h) }))
+    .filter((x): x is { h: Holding; b: Basis } => x.b !== null && x.h.reading.token !== null);
+  const totalPnl = priced.reduce((sum, { h, b }) => sum + unrealised(b, h.reading.token!.price).usd, 0);
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -229,6 +242,14 @@ export function Portfolio({
         </div>
         <Stat label="xStocks" value={fmtUsd(invested)} />
         <Stat label="USDC" value={fmtUsd(cash)} />
+        {priced.length > 0 && (
+          <Stat
+            label="Unrealised P&L"
+            value={signedUsd(totalPnl)}
+            color={pnlColor(totalPnl)}
+            title={`Against the entry prices recorded for ${priced.length} of ${holdings.length} holdings: Kolu fills read back from chain, or a price you entered. Stored in this browser.`}
+          />
+        )}
         {holdings.length > 0 && (
           <Stat
             label="If gaps close"
@@ -363,6 +384,17 @@ export function Portfolio({
                   {muted && convergence !== null ? " (noise)" : ""}
                 </span>
               </div>
+              {showPnl && (
+                <div className="mt-1.5">
+                  <PnlCell
+                    basis={basisFor(journal, r.ticker, amount)}
+                    price={r.token?.price ?? null}
+                    held={amount}
+                    onSet={(p) => setManual(r.ticker, p)}
+                    inline
+                  />
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between gap-3">
                 <span
                   className="min-w-0 text-[11px]"
@@ -390,6 +422,7 @@ export function Portfolio({
             <th className="py-2 text-left font-normal">Holding</th>
             <th className="py-2 text-right font-normal">Quantity</th>
             <th className="py-2 text-right font-normal">Value</th>
+            {showPnl && <th className="py-2 text-right font-normal">P&amp;L</th>}
             <th className="py-2 text-right font-normal">Gap</th>
             <th className="py-2 text-right font-normal">If gap closes</th>
             <th className="w-[124px] py-2" aria-label="Trade" />
@@ -418,6 +451,16 @@ export function Portfolio({
                 </td>
                 <td className="num py-2.5 text-right">{fmtAmount(amount)}</td>
                 <td className="num py-2.5 text-right">{fmtUsd(value)}</td>
+                {showPnl && (
+                  <td className="py-2.5 text-right">
+                    <PnlCell
+                      basis={basisFor(journal, r.ticker, amount)}
+                      price={r.token?.price ?? null}
+                      held={amount}
+                      onSet={(p) => setManual(r.ticker, p)}
+                    />
+                  </td>
+                )}
                 <td
                   className="num py-2.5 text-right"
                   style={{
@@ -683,6 +726,118 @@ function deepestDiscount(readings: BasisReading[]): BasisReading | null {
           (r.signal === "actionable" || r.signal === "stale_reference"),
       )
       .sort((a, b) => (a.basisBps ?? 0) - (b.basisBps ?? 0))[0] ?? null
+  );
+}
+
+/**
+ * Unrealised P&L against a recorded entry, or a way to record one. A Kolu
+ * fill is exact; a typed price is the owner's, and says so.
+ */
+function PnlCell({
+  basis,
+  price,
+  held,
+  onSet,
+  inline = false,
+}: {
+  basis: Basis | null;
+  price: number | null;
+  held: number;
+  onSet: (price: number | null) => void;
+  /** Phone card: one line, left-aligned. */
+  inline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const align = inline ? "justify-start" : "justify-end";
+
+  if (editing) {
+    const save = (e: FormEvent) => {
+      e.preventDefault();
+      const n = Number(draft.replace(/[$,\s]/g, ""));
+      if (n > 0 && Number.isFinite(n)) {
+        onSet(n);
+        setEditing(false);
+      }
+    };
+    return (
+      <form onSubmit={save} className={`flex items-center gap-1.5 ${align}`}>
+        <span className="text-[12px] text-[var(--text-3)]">$</span>
+        <input
+          autoFocus
+          inputMode="decimal"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
+          placeholder="entry"
+          aria-label="Entry price per token, USD"
+          className="num h-7 w-[84px] rounded-[5px] border border-[var(--border-strong)] bg-transparent px-2 text-right text-[12px] outline-none focus:border-[var(--accent)]"
+        />
+        <button type="submit" className="text-[12px] text-[var(--accent)] hover:underline">
+          Save
+        </button>
+        {basis?.source === "manual" && (
+          <button
+            type="button"
+            onClick={() => {
+              onSet(null);
+              setEditing(false);
+            }}
+            className="text-[12px] text-[var(--text-3)] hover:text-white"
+          >
+            Clear
+          </button>
+        )}
+      </form>
+    );
+  }
+
+  const edit = () => {
+    setDraft(basis ? basis.entry.toFixed(2) : "");
+    setEditing(true);
+  };
+
+  if (!basis || price === null) {
+    return (
+      <button
+        type="button"
+        onClick={edit}
+        className={`text-[12px] text-[var(--text-3)] transition-colors hover:text-white ${inline ? "" : "ml-auto block"}`}
+        title="Kolu records the entry of trades made here automatically. For anything bought elsewhere, enter what you paid per token."
+      >
+        + Add entry price
+      </button>
+    );
+  }
+
+  const { usd, pct } = unrealised(basis, price);
+  const partial = basis.coveredQty < held - 1e-9;
+  const detail = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% · entry ${fmtUsd(basis.entry)}${
+    basis.source === "manual" ? " (yours)" : ""
+  }${partial ? ` · on ${fmtAmount(basis.coveredQty)} of ${fmtAmount(held)}` : ""}`;
+
+  return inline ? (
+    <span className="num flex flex-wrap items-baseline gap-x-2 text-[12px]">
+      <span style={{ color: pnlColor(usd) }}>P&amp;L {signedUsd(usd)}</span>
+      <span className="text-[var(--text-3)]">{detail}</span>
+      <button type="button" onClick={edit} className="text-[var(--text-3)] hover:text-white">
+        Edit
+      </button>
+    </span>
+  ) : (
+    <button
+      type="button"
+      onClick={edit}
+      className="num block w-full text-right"
+      title={
+        basis.source === "kolu"
+          ? "From your swaps through Kolu, read back from chain. Click to override with your own entry."
+          : "Your entered entry price. Click to change or clear it."
+      }
+    >
+      <span style={{ color: pnlColor(usd) }}>{signedUsd(usd)}</span>
+      <span className="block text-[11px] text-[var(--text-3)]">{detail}</span>
+    </button>
   );
 }
 

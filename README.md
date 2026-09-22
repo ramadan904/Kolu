@@ -127,6 +127,14 @@ quantity, value, gap, and what each holding gains or loses if the token
 converges to the real share. Holdings outside the table's filter are listed,
 never silently dropped from the total.
 
+**P&L you can trust.** On a connected wallet, every swap made through Kolu
+records its entry from the confirmed transaction's actual balance changes —
+slippage included, never the quote. For anything bought elsewhere, type the
+entry price in; it is labelled as yours. Kolu does not reconstruct a cost basis
+from chain history, because the public RPC reads only recent transactions and
+an average over a partial history is a confident wrong number. Stored in this
+browser; watched addresses never get P&L.
+
 **Limit orders at a gap.** "Buy TSLAX if it trades 0.5% under the real share":
 Kolu turns the gap target into a real Jupiter limit order, held and filled
 on-chain while nobody is watching — Kolu can be closed. The limit is fixed from

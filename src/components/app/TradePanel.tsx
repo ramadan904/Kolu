@@ -24,6 +24,7 @@ import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
 import { LimitOrder } from "./LimitOrder";
 import { useDislocations } from "./useDislocations";
+import { recordFill } from "./useJournal";
 import { NARROWED_PCT } from "@/lib/data/market-history";
 
 export type Side = "buy" | "sell";
@@ -421,6 +422,10 @@ export function TradePanel({
         received: fromBaseUnits(live.outAmount, live.outDecimals),
       });
       requestBalancesRefresh();
+      // The entry price for P&L, read back from what actually moved.
+      if (tokenMint && quoteMint) {
+        void recordFill(connection, signature, publicKey.toBase58(), reading.ticker, tokenMint, quoteMint);
+      }
     } catch (err) {
       setTx({ kind: "error", message: describeTradeError(err, { slippageBps, payUnit }), signature, stage });
       // A failed swap still spends a fee; balances should say so.
@@ -438,6 +443,9 @@ export function TradePanel({
     slippageBps,
     connection,
     payUnit,
+    tokenMint,
+    quoteMint,
+    reading.ticker,
   ]);
 
   const canSwap = connected && sizeValid && quote?.available === true && !busy && !shortfall;
