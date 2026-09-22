@@ -43,7 +43,7 @@ export function HowItReads({
   const steps = [
     {
       n: 1,
-      title: "Is the gap real?",
+      title: source === "pyth" ? "Is the gap real? · Pyth confidence" : "Is the gap real? · assumed band",
       value: noise !== null ? `±${noise.toFixed(1)}bps` : "—",
       caption: "noise floor now",
       body: `${bandCopy(source).long} ${signals} of ${readings.length} pairs are outside it right now.`,

@@ -119,7 +119,13 @@ export function MarketMap({
         <h2 className="eyebrow ">
           Market map
         </h2>
-        <p className="text-[12px] text-[var(--text-3)]">
+        <p className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--text-3)]">
+          <span
+            className="mono rounded-full border border-[var(--border)] bg-white/[0.03] px-2 py-0.5 text-[10.5px] tracking-[0.04em] text-[var(--text-2)]"
+            title={bandCopy(source).long}
+          >
+            band · {source === "pyth" ? "Pyth confidence" : "assumed ±6bps a leg"}
+          </span>
           {outliers === 0 ? (
             delayed > 0 ? "No clean dislocations" : "Every pair inside the noise floor"
           ) : (

@@ -55,38 +55,62 @@ Multi-stage, runs unprivileged, and carries a `HEALTHCHECK` that polls
 
 ## Environment variables
 
-**One matters: `PYTH_API_KEY`.** Without it the app runs and is fully
-demonstrable, but on labelled demo data rather than live prices.
+**None are required.** With an empty environment the board serves live prices
+for both legs from Jupiter, which needs no key — `/api/health` reads
+`serving: jupiter`. Two are worth setting, and each changes something you can
+see:
+
+- **`PYTH_API_KEY`** switches the price source to Pyth. The visible difference
+  is the noise floor: with Pyth the grey band is the **confidence interval
+  published with each price**; without it the band is Kolu's own **assumed
+  ±6bps a leg**, said in those words on the board and in
+  `/api/health` → `noiseFloor.basis`. Stale-vs-stalled works either way, from
+  each price's publish time.
+- **`SOLANA_RPC_URL`** gives the wallet relay a dedicated endpoint instead of
+  the keyless public ones. Nothing breaks without it — the relay falls over
+  between two public endpoints — but a rate limit mid-demo costs latency.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `PYTH_API_KEY` | _(none)_ | **Required for live prices.** See below. |
+| `PYTH_API_KEY` | _(none)_ | Switches serving to Pyth and the noise band to published confidence. Optional: Jupiter serves live prices without it. See below. |
 | `PYTH_HERMES_ENDPOINT` | `https://hermes.pyth.network` | Oracle endpoint. Point at a private Hermes if you have one. |
-| `KOLU_PRICE_SOURCE` | `pyth` | `fixture` forces demo data. Use for a guaranteed-stable demo. |
+| `KOLU_PRICE_SOURCE` | auto (`pyth` when `PYTH_API_KEY` is set, else `jupiter`) | `fixture` forces labelled demo data. Use for a guaranteed-stable demo. |
 | `KOLU_SCENARIO` | `weekend_drift` | Which demo scenario: `weekend_drift`, `live_dislocation`, `calm`, `degraded`. |
 | `KOLU_TOKEN_SYMBOL_TEMPLATE` | `Crypto.{TOKEN}/USD` | **The one to know about.** See below. |
 | `KOLU_EQUITY_SYMBOL_TEMPLATE` | `Equity.US.{TICKER}/USD` | Equity symbol naming. |
 | `KOLU_TOKEN_TICKER_TEMPLATE` | `{TICKER}X` | How a ticker becomes its tokenized ticker. |
 | `KOLU_BOARD_CACHE_MS` | `4000` | Snapshot cache window. `0` disables. |
 | `JUPITER_ENDPOINT` | `https://lite-api.jup.ag` | Router used for measured price impact. |
-| `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` | **Set this before a demo with wallets.** Upstream for the `/api/rpc` relay (balances, send, confirm). Server-side only, so a keyed provider URL (Alchemy, Helius, QuickNode) never reaches the browser. Tick **Preview** as well as Production on Vercel. `/api/health` → `execution.walletRpc` confirms it. |
+| `SOLANA_RPC_URL` | _(none — relay uses `solana-rpc.publicnode.com`, then `api.mainnet-beta.solana.com`)_ | **Set this before a demo with wallets.** Upstream for the `/api/rpc` relay (balances, send, confirm). Server-side only, so a keyed provider URL (Alchemy, Helius, QuickNode) never reaches the browser. Tick **Preview** as well as Production on Vercel. `/api/health` → `execution.walletRpc` confirms it. |
 | `NEXT_PUBLIC_SOLANA_RPC` | _(none)_ | Lets the browser call a CORS-enabled RPC directly, bypassing the relay. Shipped to every visitor — never a paid key. |
 
-### Why live prices need a key
+### Running on Pyth
 
 Pyth began requiring authentication on Hermes in **August 2026**. The split is
-awkward and worth knowing: `/v2/price_feeds` still answers anonymously, so
-symbol resolution succeeds and the app reports all 12 pairs resolved — but
-`/v2/updates/price/latest` returns **401**, so not one price arrives.
+worth knowing: `/v2/price_feeds` still answers anonymously, so symbol
+resolution succeeds and the app reports all 12 pairs resolved — but
+`/v2/updates/price/latest` returns **401**, so no price arrives. Rather than
+show a working integration serving nothing, Kolu serves Jupiter by default and
+keeps the Pyth adapter one variable away.
 
-The result looks like a working integration serving no data. `/api/health`
-names it directly: `source.apiKeyConfigured` tells you whether a key is set,
-and the fallback reason says what to do.
+**To switch:** get a key from the Pyth developer hub, then on Vercel go to
+Settings → Environment Variables → add `PYTH_API_KEY` for Production (tick
+Preview too) → Redeploy. Nothing else changes.
 
-Get a key from the Pyth developer hub, then set `PYTH_API_KEY` in your host's
-environment (Vercel: Settings → Environment Variables → add → Redeploy).
-Without it, `status` reads `demo_fallback` and the board shows the amber
-"Demo data" banner — honest and demoable, just not live.
+**Verify in one request** — `/api/health`:
+
+| Field | Without a key | With `PYTH_API_KEY` |
+| --- | --- | --- |
+| `source.serving` | `jupiter` | `pyth` |
+| `source.apiKeyConfigured` | `false` | `true` |
+| `noiseFloor.basis` | `assumed` | `published confidence` |
+| `noiseFloor.perLegBps` | `6` | `null` (per price, from the feed) |
+
+On the board itself, the market map's band chip reads **"band · assumed ±6bps a
+leg"** or **"band · Pyth confidence"**, and *How Kolu reads a gap* says the same
+in full. If a key is set but Hermes cannot be reached, the board falls back to
+labelled demo data — amber banner, `status: demo_fallback` — and never passes
+modelled numbers off as live.
 
 ### The symbol-naming variable
 

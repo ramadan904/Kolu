@@ -169,6 +169,15 @@ positions view that values any Solana address's real xStock holdings against
 the live gaps. 236 tests. Falls back to labelled demo data when the live source
 is unreachable.
 
+**The Pyth path, proven without a key:** an integration test stands up Hermes'
+own response shapes and gives two pairs the same 40bps gap but different
+published confidence — ±120bps a leg for one, ±5bps for the other. The board
+classifies the wide one as noise and the narrow one as actionable, so the noise
+floor demonstrably comes from the feed rather than the ±6bps assumption the
+keyless deployment uses. `/api/health` reports which is in force
+(`noiseFloor.basis`), and the board's own chip reads "band · Pyth confidence"
+or "band · assumed ±6bps a leg".
+
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
 tickers, both legs — resolve against `hermes.pyth.network` in CI, on every
 change to the universe and on a weekday schedule. The tokenized twins are
