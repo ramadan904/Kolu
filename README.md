@@ -101,6 +101,13 @@ through the session, opens once the underlying market shuts, and collapses at
 the next open. A single number cannot tell you whether a dislocation is
 widening or already halfway closed.
 
+**The thesis, tested.** *Does the gap close at the open?* takes every
+regular-session open in the last week, per pair, and compares the gap in the
+hour before 09:30 ET with the gap 30–90 minutes in, once the share trades. It
+usually narrows — not always, and the misses are shown, because "it converges
+by the open" is exactly the bet a closed-market trade is making. The chart
+switches between 48 hours and 7 days, so a full weekend is always in view.
+
 **Alerts that respect your sleep.** Arm a threshold per ticker and Kolu watches
 for you, in-page and via browser notification. What matters is what it refuses
 to fire on: a gap inside the oracle noise floor, or one measured against a feed

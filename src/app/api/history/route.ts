@@ -3,7 +3,7 @@ import { buildBoard } from "@/lib/board";
 import { seriesFor } from "@/lib/history";
 import { findEntry } from "@/lib/universe";
 import { loadMints } from "@/lib/mints";
-import { realHistory } from "@/lib/data/market-history";
+import { DEFAULT_WINDOW_MS, MAX_WINDOW_MS, realHistory } from "@/lib/data/market-history";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,10 +19,12 @@ export async function GET(request: Request) {
   // Real history first: the token's own trades against the share's real
   // prints. Skipped for a replay (`modelled=1`), whose gap is modelled too.
   const modelledOnly = new URL(request.url).searchParams.get("modelled") === "1";
+  // 48h by default; `days=7` for the week (the only other window offered).
+  const windowMs = new URL(request.url).searchParams.get("days") === "7" ? MAX_WINDOW_MS : DEFAULT_WINDOW_MS;
   if (!modelledOnly) {
     try {
       const mint = (await loadMints()).tokens[entry.ticker]?.mint;
-      const points = mint ? await realHistory(entry.ticker, mint) : null;
+      const points = mint ? await realHistory(entry.ticker, mint, windowMs) : null;
       if (points) {
         return NextResponse.json(
           {

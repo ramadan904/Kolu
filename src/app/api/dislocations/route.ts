@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { breakevenBps } from "@/lib/basis/edge";
-import { downsample, realHistory } from "@/lib/data/market-history";
+import {
+  DEFAULT_WINDOW_MS,
+  downsample,
+  MAX_WINDOW_MS,
+  openEvents,
+  realHistory,
+  type OpenEvent,
+} from "@/lib/data/market-history";
 import type { SessionPhase } from "@/lib/market/session";
 import { loadMints } from "@/lib/mints";
 import { CORE_UNIVERSE } from "@/lib/universe";
@@ -20,12 +27,15 @@ export interface Dislocation {
   clearedCosts: boolean;
   /** Hourly medians over the window, for a sparkline: [unix ms, bps, shut?]. */
   spark: [number, number, boolean][];
+  /** Every open in the last week: the gap before, after, and how much closed. */
+  opens: OpenEvent[];
 }
 
 const SHUT = new Set<SessionPhase>(["closed", "weekend", "holiday"]);
 
 /**
- * The widest real gap each liquid pair showed in the last 48h, from its pool
+ * The widest real gap each liquid pair showed in the last 48h, and what
+ * happened to its gap at each open in the last week, from its pool
  * trades against the share's last print — the same series the chart draws.
  * Pairs are read one after another so a cold cache stays inside the history
  * sources' rate limits; the response is cached at the edge for five minutes.
@@ -38,8 +48,10 @@ export async function GET() {
 
   for (const entry of CORE_UNIVERSE) {
     const mint = mints.tokens[entry.ticker]?.mint;
-    const points = mint ? await realHistory(entry.ticker, mint) : null;
-    if (!points || points.length === 0) {
+    const week = mint ? await realHistory(entry.ticker, mint, MAX_WINDOW_MS) : null;
+    const cutoff = Date.now() - DEFAULT_WINDOW_MS;
+    const points = week?.filter((p) => p.t >= cutoff) ?? [];
+    if (!week || points.length === 0) {
       missing += 1;
       continue;
     }
@@ -56,6 +68,7 @@ export async function GET() {
       phase: widest.phase,
       clearedCosts: Math.abs(widest.basisBps) >= breakeven,
       spark: hourly.map((p) => [p.t, Math.round(p.basisBps * 10) / 10, SHUT.has(p.phase)]),
+      opens: openEvents(week),
     });
   }
 

@@ -27,6 +27,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { GapHistory } from "./GapHistory";
 import { RecentDislocations } from "./RecentDislocations";
 import { HowItReads } from "./HowItReads";
+import { OpenConvergence } from "./OpenConvergence";
 import { type MintMap, type Side } from "./TradePanel";
 import { TradeDrawer } from "./TradeDrawer";
 import { useBalances } from "./useBalances";
@@ -44,6 +45,13 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [demo, setDemo] = useState<Scenario | null>(null);
   // Pair shown in the on-page gap history; defaults to the headline pair.
   const [chartTicker, setChartTicker] = useState<string | null>(null);
+  const [chartDays, setChartDays] = useState<2 | 7>(2);
+  // From a list below the chart: switch it to that pair (and window), and bring it into view.
+  const showHistory = (ticker: string, days?: 2 | 7) => {
+    setChartTicker(ticker);
+    if (days) setChartDays(days);
+    document.getElementById("gap-history")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const [selected, setSelected] = useState<string | null>(null);
   // Set only when a holding asks for a specific side; otherwise the ticket
   // opens on the side that captures the gap.
@@ -415,6 +423,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           readings={board.readings}
           ticker={chartTicker ?? headline?.ticker ?? null}
           onTicker={setChartTicker}
+          days={chartDays}
+          onDays={setChartDays}
           onTrade={(t) => openTrade(t)}
           demo={demo !== null}
         />
@@ -458,14 +468,14 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
 
       <div className="mt-5" />
       {!demo && (
-        <ErrorBoundary name="Recent dislocations">
-          <RecentDislocations
-            onSelect={(t) => {
-              setChartTicker(t);
-              document.getElementById("gap-history")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
-          />
-        </ErrorBoundary>
+        <>
+          <ErrorBoundary name="Recent dislocations">
+            <RecentDislocations onSelect={showHistory} />
+          </ErrorBoundary>
+          <ErrorBoundary name="Open convergence">
+            <OpenConvergence onSelect={(t) => showHistory(t, 7)} />
+          </ErrorBoundary>
+        </>
       )}
 
       <ErrorBoundary name="How Kolu reads a gap">

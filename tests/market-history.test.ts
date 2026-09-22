@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { alignBasis } from "@/lib/data/market-history";
+import { alignBasis, openEvents } from "@/lib/data/market-history";
+import type { HistoryPoint } from "@/lib/history";
 
 describe("alignBasis", () => {
   it("measures each token bar against the last equity print at or before it", () => {
@@ -67,5 +68,39 @@ describe("rollingMedian / downsample", () => {
     expect(d).toHaveLength(2);
     expect(d[0].basisBps).toBe(0); // [0,0,200,0]
     expect(d[1].basisBps).toBe(10); // [0,10,10,10] -> 10
+  });
+});
+
+describe("openEvents", () => {
+  const H = 3_600_000;
+  // A Monday 09:30 ET open (13:30 UTC), 15-minute bars from 05:30 ET.
+  const open = Date.UTC(2026, 8, 21, 13, 30);
+  const bar = (i: number, bps: number) => {
+    const t = open - 4 * H + i * 15 * 60_000;
+    return { t, basisBps: bps, phase: (t < open ? "premarket" : "regular") as HistoryPoint["phase"] };
+  };
+
+  it("measures how much of the pre-open gap was gone an hour in", () => {
+    const pts = Array.from({ length: 28 }, (_, i) => bar(i, i < 16 ? 60 : 12));
+    const [e] = openEvents(pts);
+    expect(e.t).toBe(open);
+    expect(e.beforeBps).toBe(60);
+    expect(e.afterBps).toBe(12);
+    expect(e.closedPct).toBe(80);
+  });
+
+  it("reports a gap that widened after the open as negative", () => {
+    const pts = Array.from({ length: 28 }, (_, i) => bar(i, i < 16 ? -40 : -60));
+    expect(openEvents(pts)[0].closedPct).toBe(-50);
+  });
+
+  it("skips opens whose pre-open gap is noise", () => {
+    const pts = Array.from({ length: 28 }, (_, i) => bar(i, i < 16 ? 8 : 2));
+    expect(openEvents(pts)).toEqual([]);
+  });
+
+  it("skips opens with no trades to measure after", () => {
+    const pts = Array.from({ length: 17 }, (_, i) => bar(i, 50));
+    expect(openEvents(pts)).toEqual([]);
   });
 });

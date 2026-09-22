@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Dislocation } from "@/app/api/dislocations/route";
 import { fmtBps } from "@/lib/format";
 import { etTime, PHASE_COPY } from "./GapHistory";
+import { useDislocations } from "./useDislocations";
 
 /**
  * The widest real gap each liquid pair showed in the last two days — when it
@@ -11,27 +11,7 @@ import { etTime, PHASE_COPY } from "./GapHistory";
  * version of a "top movers" list: most rows say it would not have.
  */
 export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) => void }) {
-  const [rows, setRows] = useState<Dislocation[] | null>(null);
-  const [breakeven, setBreakeven] = useState<number | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/dislocations");
-        const body = await res.json();
-        if (cancelled) return;
-        setRows(body.dislocations ?? []);
-        setBreakeven(body.breakevenBps ?? null);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { rows, breakevenBps: breakeven, failed } = useDislocations();
 
   return (
     <section className="panel mb-5 overflow-hidden" aria-labelledby="recent-dislocations">

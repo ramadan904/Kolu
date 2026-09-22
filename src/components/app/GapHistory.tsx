@@ -17,14 +17,31 @@ export const PHASE_COPY: Record<SessionPhase, string> = {
   holiday: "holiday, market shut",
 };
 
+/** "Mon 21, 02:30" in New York time: the date too, since a week holds two Mondays' worth of ambiguity. */
 export function etTime(t: number): string {
-  return new Date(t).toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date(t))
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.weekday} ${parts.day}, ${parts.hour}:${parts.minute}`;
+}
+
+/** "Thu 17" in New York time. */
+export function etDay(t: number): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", day: "numeric" })
+      .formatToParts(new Date(t))
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.weekday} ${parts.day}`;
 }
 
 /**
@@ -38,12 +55,17 @@ export function GapHistory({
   onTicker,
   onTrade,
   demo,
+  days,
+  onDays,
 }: {
   readings: BasisReading[];
   ticker: string | null;
   onTicker: (ticker: string) => void;
   onTrade: (ticker: string) => void;
   demo: boolean;
+  /** Window: two days (the default) or the week, which always holds a weekend. */
+  days: 2 | 7;
+  onDays: (days: 2 | 7) => void;
 }) {
   const [series, setSeries] = useState<HistorySeries | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,7 +78,7 @@ export function GapHistory({
     setLoading(true);
     void (async () => {
       try {
-        const res = await fetch(`/api/history?ticker=${active}${demo ? "&modelled=1" : ""}`);
+        const res = await fetch(`/api/history?ticker=${active}${demo ? "&modelled=1" : days === 7 ? "&days=7" : ""}`);
         if (!res.ok) throw new Error();
         const body = (await res.json()) as HistorySeries;
         if (!cancelled) setSeries(body);
@@ -69,7 +91,7 @@ export function GapHistory({
     return () => {
       cancelled = true;
     };
-  }, [active, demo]);
+  }, [active, demo, days]);
 
   const real = series?.source === "market" && series.ticker === active;
   const stats = useMemo(() => {
@@ -86,8 +108,26 @@ export function GapHistory({
     <section className="panel mb-5 px-4 pt-3.5 pb-4 sm:px-5" aria-labelledby="gap-history">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="gap-history" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-          Gap history · 48 hours
+          Gap history · {days === 7 ? "7 days" : "48 hours"}
         </h2>
+        <div className="flex flex-wrap items-center gap-3">
+        {!demo && (
+          <div className="flex rounded-[6px] border border-[var(--border)] p-0.5" role="group" aria-label="Window">
+            {([2, 7] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={days === d}
+                onClick={() => onDays(d)}
+                className={`rounded-[4px] px-2 py-0.5 text-[12px] transition-colors ${
+                  days === d ? "bg-[var(--raised)] text-white" : "text-[var(--text-3)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                {d === 2 ? "48h" : "7d"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-1" role="tablist" aria-label="Pair">
           {readings.map((r) => (
             <button
@@ -106,12 +146,13 @@ export function GapHistory({
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0">
           {series && series.ticker === active ? (
-            <BasisChart series={series} />
+            <BasisChart series={series} days={demo ? 2 : days} />
           ) : (
             <div className="skeleton h-[190px]" aria-label={loading ? "Loading history" : "History unavailable"} />
           )}
@@ -128,7 +169,7 @@ export function GapHistory({
               </span>
             )}
           </Fact>
-          <Fact label="Widest hour in 48h">
+          <Fact label={`Widest hour in ${days === 7 && !demo ? "7 days" : "48h"}`}>
             {stats ? (
               <>
                 <span className="num text-white">{fmtBps(stats.widest.basisBps, 0)}</span>

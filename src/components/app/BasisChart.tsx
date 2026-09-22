@@ -16,7 +16,7 @@ const PLOT_H = H - PAD.top - PAD.bottom;
 const SHUT = new Set(["closed", "weekend", "holiday"]);
 
 /**
- * Basis over 48 hours, with the closed-market periods shaded.
+ * Basis over the window (48 hours, or a week), with the closed-market periods shaded.
  *
  * The shading is the argument, not decoration: the gap sits pinned near zero
  * while the underlying can be traded, opens once it cannot, and collapses at
@@ -25,8 +25,11 @@ const SHUT = new Set(["closed", "weekend", "holiday"]);
 export function BasisChart({
   series,
   observed = [],
+  days = 2,
 }: {
   series: HistorySeries;
+  /** The window the series covers, for its labels. */
+  days?: 2 | 7;
   /** Points this browser actually saw the board return. */
   observed?: { t: number; basisBps: number }[];
 }) {
@@ -35,6 +38,7 @@ export function BasisChart({
   // dashed and dimmed, so the two can never be confused.
   const real = series.source === "market";
   const [hover, setHover] = useState<number | null>(null);
+  const windowLabel = days === 7 ? "7 days" : "48 hours";
 
   const model = useMemo(() => {
     const raw = series.points;
@@ -138,7 +142,7 @@ export function BasisChart({
     <figure className="m-0">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)]">
-          <span>48 hours · shaded when the market was shut</span>
+          <span>{windowLabel} · shaded when the market was shut</span>
           <span className="flex items-center gap-1.5 normal-case tracking-normal">
             <svg width="14" height="6" aria-hidden="true">
               <line
@@ -187,7 +191,7 @@ export function BasisChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full touch-none select-none"
         role="img"
-        aria-label={`Basis over 48 hours, currently ${fmtBps(last.basisBps, 1)}`}
+        aria-label={`Basis over ${windowLabel}, currently ${fmtBps(last.basisBps, 1)}`}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >

@@ -1,5 +1,5 @@
 /**
- * Real 48-hour basis history, from two public sources.
+ * Real basis history (48 hours to a week), from two public sources.
  *
  * The token leg is the xStock's own trading: 15-minute candles from its
  * deepest on-chain pool (GeckoTerminal, no key). The equity leg is the real
@@ -114,7 +114,7 @@ export async function tokenBars(mint: string, ticker?: string): Promise<PriceBar
   const pool = await deepestPool(mint, ticker).catch(() => (ticker ? (KNOWN_POOLS[ticker] ?? null) : null));
   if (!pool) return [];
   const body = (await getJson(
-    `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=15&limit=200&currency=usd&token=${mint}`,
+    `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=15&limit=700&currency=usd&token=${mint}`,
   )) as { data?: { attributes?: { ohlcv_list?: number[][] } } };
   return (body.data?.attributes?.ohlcv_list ?? [])
     .filter((row) => row.length >= 5)
@@ -123,7 +123,7 @@ export async function tokenBars(mint: string, ticker?: string): Promise<PriceBar
 
 export async function equityBars(ticker: string): Promise<PriceBar[]> {
   const body = (await getJson(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=15m&range=5d&includePrePost=true`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=15m&range=1mo&includePrePost=true`,
   )) as {
     chart?: { result?: { timestamp?: number[]; indicators?: { quote?: { close?: (number | null)[] }[] } }[] };
   };
@@ -143,17 +143,34 @@ const seriesCache = new Map<string, { points: HistoryPoint[]; at: number }>();
 const SERIES_TTL_MS = 5 * 60_000;
 /** A refresh that fails serves the last good series this long, rather than a model. */
 const STALE_OK_MS = 2 * 3600_000;
-const WINDOW_MS = 48 * 3600_000;
+/** How far back anything is kept: a week always contains a weekend and five opens. */
+export const MAX_WINDOW_MS = 7 * 24 * 3600_000;
+export const DEFAULT_WINDOW_MS = 48 * 3600_000;
 
-/** Real basis history for the last 48h, or null if either source is unavailable. */
-export async function realHistory(ticker: string, mint: string): Promise<HistoryPoint[] | null> {
+/**
+ * Real basis history for the last `windowMs` (48h by default, up to 7 days),
+ * or null if either source is unavailable. One fetch serves every window.
+ */
+export async function realHistory(
+  ticker: string,
+  mint: string,
+  windowMs = DEFAULT_WINDOW_MS,
+): Promise<HistoryPoint[] | null> {
+  const full = await fullHistory(ticker, mint);
+  if (!full) return null;
+  const cutoff = Date.now() - Math.min(windowMs, MAX_WINDOW_MS);
+  const points = full.filter((p) => p.t >= cutoff);
+  // Too sparse to show a shape is not history; let the caller fall back.
+  return points.length < 24 ? null : points;
+}
+
+async function fullHistory(ticker: string, mint: string): Promise<HistoryPoint[] | null> {
   const hit = seriesCache.get(ticker);
   if (hit && Date.now() - hit.at < SERIES_TTL_MS) return hit.points;
   try {
     const [token, equity] = await Promise.all([tokenBars(mint, ticker), equityBars(ticker)]);
-    const cutoff = Date.now() - WINDOW_MS;
+    const cutoff = Date.now() - MAX_WINDOW_MS;
     const points = alignBasis(token, equity).filter((p) => p.t >= cutoff);
-    // Too sparse to show a shape is not history; let the caller fall back.
     if (points.length < 24) return staleOrNull(ticker);
     seriesCache.set(ticker, { points, at: Date.now() });
     return points;
@@ -237,4 +254,48 @@ export function downsample(points: HistoryPoint[], bucketMs = 3600_000): History
         phase: list[Math.floor(list.length / 2)].phase,
       };
     });
+}
+
+export interface OpenEvent {
+  /** The regular-session open, unix ms. */
+  t: number;
+  /** Median gap in the hour before the open, against the last print. */
+  beforeBps: number;
+  /** Median gap 30-90 minutes after the open, once the share is trading. */
+  afterBps: number;
+  /** Share of the pre-open gap that was gone, 0-100 (negative if it widened). */
+  closedPct: number;
+}
+
+/** Below this the pre-open gap is noise, and "how much closed" means nothing. */
+export const MIN_OPEN_GAP_BPS = 15;
+
+/**
+ * Every regular-session open in the series, with the gap just before and just
+ * after. This is the test of the thesis rather than the picture of it: if the
+ * token only drifts because its reference is shut, the gap should shrink once
+ * the share trades again. Opens with a pre-open gap inside the noise, or too
+ * few trades either side to measure, are skipped rather than guessed.
+ */
+export function openEvents(points: HistoryPoint[]): OpenEvent[] {
+  const out: OpenEvent[] = [];
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].phase !== "regular" || points[i - 1].phase === "regular") continue;
+    // The open itself: first regular bar, snapped back to the half hour.
+    const t = Math.floor(points[i].t / 1_800_000) * 1_800_000;
+    const window = (a: number, b: number) =>
+      points.filter((p) => p.t >= t + a && p.t < t + b).map((p) => p.basisBps);
+    const before = median(window(-3_600_000, 0));
+    const afterVals = window(1_800_000, 5_400_000);
+    const after = median(afterVals);
+    if (before === null || after === null || afterVals.length < 2) continue;
+    if (Math.abs(before) < MIN_OPEN_GAP_BPS) continue;
+    out.push({
+      t,
+      beforeBps: before,
+      afterBps: after,
+      closedPct: Math.round((1 - Math.abs(after) / Math.abs(before)) * 100),
+    });
+  }
+  return out;
 }
