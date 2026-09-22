@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { AssetList } from "./AssetList";
 import { BasisChart } from "./BasisChart";
 import { Hero } from "./Hero";
+import { Tape } from "./Tape";
 import { MarketClock } from "./MarketClock";
 import { MarketMap } from "./MarketMap";
 import { Portfolio } from "./Portfolio";
@@ -414,6 +415,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </div>
       </div>
 
+      <div className="mt-4">
+        <Tape readings={board.readings} onSelect={(t) => openTrade(t)} />
+      </div>
+
       {board.degraded === "no_feeds" && (
         <p className="mt-4 rounded-[var(--radius)] border border-[var(--up)]/25 bg-[var(--up-soft)] px-4 py-3 text-[13px] leading-relaxed">
           The oracle answered and none of the requested symbols exist. Demo data is
@@ -504,6 +509,11 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         breakevenBps={breakeven}
         armedAtBreakeven={armedAtBreakeven}
         pairs={board.readings.length}
+        signals={tradeable.length}
+        closest={board.readings.reduce<(typeof board.readings)[number] | null>(
+          (best, r) => (r.basisBps !== null && (!best || Math.abs(r.basisBps) > Math.abs(best.basisBps ?? 0)) ? r : best),
+          null,
+        )}
         onArmBreakeven={demo ? undefined : armBreakeven}
         onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
       />
@@ -526,7 +536,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       </ErrorBoundary>
 
       <div id="pairs" className="mb-3 flex scroll-mt-4 items-center justify-between">
-        <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 className="eyebrow ">
           All tracked pairs
         </h2>
         <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] p-0.5">
@@ -688,12 +698,15 @@ const HEADS = {
   ],
 } as const;
 
+const EYEBROW = { portfolio: "Positions · live", history: "Real trades · 7 days", backtest: "Strategy · last week" } as const;
+
 function PageHead({ view }: { view: keyof typeof HEADS }) {
   const [title, sub] = HEADS[view];
   return (
-    <div className="mt-6 mb-6">
-      <h1 className="display text-[28px] leading-tight tracking-[-0.02em]">{title}</h1>
-      <p className="mt-1.5 max-w-[640px] text-[14px] leading-relaxed text-[var(--text-2)]">{sub}</p>
+    <div className="rise mt-10 mb-8">
+      <span className="eyebrow">{EYEBROW[view]}</span>
+      <h1 className="display text-electric mt-3 text-[44px] leading-[0.95] sm:text-[60px]">{title}</h1>
+      <p className="mt-3 max-w-[640px] text-[15px] leading-relaxed text-[var(--text-2)]">{sub}</p>
     </div>
   );
 }
@@ -728,11 +741,11 @@ function Explore() {
         <Link
           key={href}
           href={href}
-          className="panel group block px-4 py-3.5 transition-colors hover:border-[var(--border-strong)] sm:px-5"
+          className="panel panel-hover group block px-4 py-4 sm:px-5"
         >
-          <span className="flex items-center justify-between text-[14px] font-medium text-white">
+          <span className="flex items-center justify-between text-[15px] font-medium text-white">
             {title}
-            <span className="text-[var(--text-3)] transition-transform group-hover:translate-x-0.5">→</span>
+            <span className="text-[var(--text-3)] transition-all group-hover:translate-x-1 group-hover:text-[var(--accent-2)]">→</span>
           </span>
           <span className="mt-1 block text-[13px] leading-relaxed text-[var(--text-3)]">{line}</span>
         </Link>

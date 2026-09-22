@@ -35,7 +35,7 @@ export function MarketClock({ session }: { session: MarketSession }) {
         </span>
       </span>
 
-      <span className="text-[var(--text-3)]">
+      <span className="mono text-[12px] text-[var(--text-3)]">
         {session.phase === "weekend" || session.phase === "holiday"
           ? `${session.label ?? SESSION_COPY[session.phase]} · ${session.etTime} ET`
           : `${session.etTime} ET`}

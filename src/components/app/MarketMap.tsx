@@ -112,7 +112,7 @@ export function MarketMap({
   return (
     <section className="panel mb-5 px-4 pb-4 pt-3.5 sm:px-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 className="eyebrow ">
           Market map
         </h2>
         <p className="text-[12px] text-[var(--text-3)]">
@@ -136,8 +136,15 @@ export function MarketMap({
       <div className="relative mt-5" style={{ height: `${plotPx(rows) + SCALE_PX}px` }}>
         {/* Noise band, then the axis, then the zero rule on top of both. */}
         <div
-          className="absolute top-0 rounded-[3px] bg-[var(--raised)]"
-          style={{ left: `${50 - noisePct}%`, width: `${noisePct * 2}%`, bottom: `${SCALE_PX}px` }}
+          className="absolute top-0 rounded-[4px]"
+          style={{
+            left: `${50 - noisePct}%`,
+            width: `${noisePct * 2}%`,
+            bottom: `${SCALE_PX}px`,
+            background:
+              "repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 7px), linear-gradient(180deg, rgba(59,130,255,0.07), rgba(59,130,255,0.02))",
+            boxShadow: "inset 0 0 0 1px rgba(59,130,255,0.14)",
+          }}
           aria-hidden="true"
         />
         <div
@@ -146,8 +153,13 @@ export function MarketMap({
           aria-hidden="true"
         />
         <div
-          className="absolute top-0 w-px bg-[var(--border-strong)]"
-          style={{ left: "50%", bottom: `${SCALE_PX}px` }}
+          className="absolute top-0 w-px"
+          style={{
+            left: "50%",
+            bottom: `${SCALE_PX}px`,
+            background: "linear-gradient(180deg, transparent, rgba(46,230,255,0.7))",
+            boxShadow: "0 0 8px rgba(46,230,255,0.5)",
+          }}
           aria-hidden="true"
         />
 
@@ -182,27 +194,35 @@ export function MarketMap({
             >
               <span
                 className="absolute bottom-0 left-1/2 w-px -translate-x-1/2"
-                style={{ height: `${stick}px`, background: color, opacity: quiet ? 0.4 : 1 }}
-                aria-hidden="true"
-              />
-              <span
-                className="absolute left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
                 style={{
-                  bottom: `${stick - 3}px`,
-                  background: color,
-                  opacity: quiet && !owned ? 0.5 : 1,
-                  // A ring, not a colour change: colour already carries direction.
-                  boxShadow: owned ? `0 0 0 2px var(--surface), 0 0 0 3.5px ${color}` : undefined,
+                  height: `${stick}px`,
+                  background: quiet ? color : `linear-gradient(180deg, ${color}, transparent)`,
+                  opacity: quiet ? 0.4 : 1,
                 }}
                 aria-hidden="true"
               />
               <span
-                className={`absolute top-0 left-1/2 z-10 -translate-x-1/2 rounded-[3px] px-1 py-px text-[11px] leading-none whitespace-nowrap transition-colors group-hover:text-white ${owned || active ? "font-medium" : ""}`}
+                className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full transition-transform duration-200 group-hover:scale-150"
+                style={{
+                  bottom: `${stick - 4}px`,
+                  background: color,
+                  opacity: quiet && !owned ? 0.5 : 1,
+                  // A ring, not a colour change: colour already carries direction.
+                  boxShadow: owned
+                    ? `0 0 0 2px #090a0f, 0 0 0 3.5px ${color}`
+                    : quiet
+                      ? undefined
+                      : `0 0 12px ${color}, 0 0 3px ${color}`,
+                }}
+                aria-hidden="true"
+              />
+              <span
+                className={`mono absolute top-0 left-1/2 z-10 -translate-x-1/2 rounded-[3px] px-1 py-px text-[10.5px] leading-none whitespace-nowrap transition-colors group-hover:text-white ${owned || active ? "font-medium" : ""}`}
                 style={{
                   color: active ? "var(--text)" : quiet && !owned ? "var(--text-3)" : "var(--text-2)",
                   // Backed in whatever colour sits behind it, so a neighbour's
                   // stick passes under the label instead of striking through it.
-                  background: Math.abs(x - 50) < noisePct ? "var(--raised)" : "var(--surface)",
+                  background: "#090a0f",
                 }}
               >
                 {reading.tokenTicker}

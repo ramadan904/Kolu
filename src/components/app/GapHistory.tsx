@@ -107,7 +107,7 @@ export function GapHistory({
   return (
     <section className="panel mb-5 px-4 pt-3.5 pb-4 sm:px-5" aria-labelledby="gap-history">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="gap-history" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 id="gap-history" className="eyebrow ">
           Gap history · {days === 7 ? "7 days" : "48 hours"}
         </h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -160,7 +160,7 @@ export function GapHistory({
 
         <dl className="grid grid-cols-2 content-start gap-x-4 gap-y-4 text-[13px] lg:grid-cols-1">
           <Fact label="Now">
-            <span className="num text-white">{reading?.basisBps != null ? fmtBps(reading.basisBps, 0) : "—"}</span>
+            <span className="display num text-[24px] text-white">{reading?.basisBps != null ? fmtBps(reading.basisBps, 0) : "—"}</span>
             {stats?.ctx && (
               <span className="block text-[12px] text-[var(--text-3)]">
                 {stats.ctx.percentile >= 50
@@ -172,7 +172,7 @@ export function GapHistory({
           <Fact label={`Widest hour in ${days === 7 && !demo ? "7 days" : "48h"}`}>
             {stats ? (
               <>
-                <span className="num text-white">{fmtBps(stats.widest.basisBps, 0)}</span>
+                <span className="display num text-[24px] text-white">{fmtBps(stats.widest.basisBps, 0)}</span>
                 <span className="block text-[12px] text-[var(--text-3)]">
                   {etTime(stats.widest.t)} ET · {PHASE_COPY[stats.widest.phase]}
                 </span>

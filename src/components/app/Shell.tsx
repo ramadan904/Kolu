@@ -9,12 +9,12 @@ function Mark() {
   return (
     <span className="flex items-center gap-2.5">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <rect width="20" height="20" rx="5" fill="#16161a" />
+        <rect width="20" height="20" rx="5" fill="#12141b" stroke="rgba(255,255,255,0.12)" />
         <rect x="9.25" y="3.5" width="1.5" height="13" rx="0.75" fill="#5c5c66" />
         <rect x="10.75" y="5.5" width="5.75" height="3" rx="1.5" fill="#ef4444" />
         <rect x="3.5" y="11.5" width="5.75" height="3" rx="1.5" fill="#1aa179" />
       </svg>
-      <span className="text-[15px] font-semibold tracking-[-0.02em]">Kolu</span>
+      <span className="text-[16px] font-semibold tracking-[-0.03em]">Kolu</span>
     </span>
   );
 }
@@ -28,7 +28,7 @@ export function Shell({
 }) {
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[#05060a]/70 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
           <Link href="/" aria-label="Kolu, board">
             <Mark />

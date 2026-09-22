@@ -31,7 +31,7 @@ export function OpenConvergence({ onSelect }: { onSelect: (ticker: string) => vo
   return (
     <section className="panel mb-5 overflow-hidden" aria-labelledby="open-convergence">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-        <h2 id="open-convergence" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 id="open-convergence" className="eyebrow ">
           Does the gap close at the open?
         </h2>
         <span className="text-[12px] text-[var(--text-3)]">
@@ -41,7 +41,7 @@ export function OpenConvergence({ onSelect }: { onSelect: (ticker: string) => vo
 
       <div className="grid gap-5 px-4 py-4 sm:px-5 lg:grid-cols-[260px_1fr]">
         <div>
-          <p className="num text-[30px] leading-none text-white">
+          <p className="display num text-electric text-[52px] leading-none">
             {narrowed} <span className="text-[18px] text-[var(--text-3)]">of {all.length}</span>
           </p>
           <p className="mt-2 text-[13px] text-[var(--text-2)]">

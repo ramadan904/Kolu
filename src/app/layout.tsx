@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { SolanaProviders } from "@/components/app/WalletProvider";
 import "./globals.css";
 
@@ -7,6 +7,14 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// Tickers, labels and the tape: a terminal's monospace, where columns line up by construction.
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
+  weight: ["400", "500"],
 });
 
 const DESCRIPTION =
@@ -32,14 +40,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08080a",
+  themeColor: "#05060a",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
       <body style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
         <SolanaProviders>{children}</SolanaProviders>
       </body>

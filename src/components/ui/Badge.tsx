@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 type Tone = "neutral" | "accent" | "down" | "up" | "warn";
 
 const TONE: Record<Tone, string> = {
-  neutral: "text-[var(--text-2)] bg-[var(--raised)]",
-  accent: "text-[var(--accent)] bg-[var(--accent-soft)]",
-  down: "text-[var(--down)] bg-[var(--down-soft)]",
-  up: "text-[var(--up)] bg-[var(--up-soft)]",
-  warn: "text-[var(--warn)] bg-[var(--warn-soft)]",
+  neutral: "text-[var(--text-2)] bg-[var(--raised)] ring-[var(--border)]",
+  accent: "text-[var(--accent)] bg-[var(--accent-soft)] ring-[var(--accent)]/25",
+  down: "text-[var(--down)] bg-[var(--down-soft)] ring-[var(--down)]/25",
+  up: "text-[var(--up)] bg-[var(--up-soft)] ring-[var(--up)]/25",
+  warn: "text-[var(--warn)] bg-[var(--warn-soft)] ring-[var(--warn)]/25",
 };
 
 export function Badge({
@@ -21,7 +21,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide ${TONE[tone]} ${className}`}
+      className={`mono inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.06em] ring-1 ring-inset ${TONE[tone]} ${className}`}
     >
       {children}
     </span>
@@ -40,8 +40,8 @@ export function Dot({ tone = "neutral", live = false }: { tone?: Tone; live?: bo
   return (
     <span
       aria-hidden="true"
-      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? "live-dot" : ""}`}
-      style={{ background: color }}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? "live-ring" : ""}`}
+      style={{ background: color, color, boxShadow: live ? `0 0 8px ${color}` : undefined }}
     />
   );
 }

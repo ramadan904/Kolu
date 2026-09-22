@@ -59,7 +59,7 @@ export function Backtest({ onTrade }: { onTrade: (ticker: string) => void }) {
   return (
     <section id="backtest" className="panel mb-5 overflow-hidden" aria-labelledby="backtest-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-        <h2 id="backtest-title" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 id="backtest-title" className="eyebrow ">
           Your rule, on last week's trades
         </h2>
         <span className="text-[12px] text-[var(--text-3)]">
@@ -360,7 +360,7 @@ const METHOD = [
 export function BacktestMethod() {
   return (
     <section className="mb-5" aria-labelledby="backtest-method">
-      <h2 id="backtest-method" className="mb-3 text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+      <h2 id="backtest-method" className="eyebrow mb-3 ">
         How the backtest works
       </h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

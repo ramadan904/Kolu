@@ -133,38 +133,49 @@ export function Portfolio({
   // everyone evaluating the product. It states what it will show instead.
   if (!owner) {
     return (
-      <div className="panel mb-5 grid gap-x-8 gap-y-5 px-4 py-4 sm:px-5 lg:grid-cols-[1fr_auto]">
-        <div>
-          <div className={LABEL}>Your position</div>
-          <p className="mt-1 text-[15px] text-white">
-            Your xStocks, valued against the live gaps.
+      <div className="glass rise mb-5 grid overflow-hidden rounded-[16px] lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="p-6 sm:p-8">
+          <span className="eyebrow">Connect · or watch any address</span>
+          <h2 className="display mt-4 max-w-[520px] text-[32px] leading-[1.02] sm:text-[40px]">
+            Every xStock you hold, <span className="text-electric">against its real share.</span>
+          </h2>
+          <p className="mt-3 max-w-[480px] text-[14px] leading-relaxed text-[var(--text-2)]">
+            Balances read straight from chain, valued at live prices, with what each gap is worth to you — and P&amp;L
+            from the trades you make here.
           </p>
-          <ul className="mt-3 grid gap-x-6 gap-y-2 text-[13px] text-[var(--text-2)] sm:grid-cols-3">
+          <ul className="mt-7 grid gap-3 sm:grid-cols-3">
             {[
-              ["Holdings vs the real share", "every xStock, its gap, and what closing it is worth"],
-              ["Limit orders at a gap", "open orders, how far each is from filling, cancel"],
-              ["Recent activity", "your latest xStock trades, read from chain"],
-            ].map(([title, body]) => (
-              <li key={title} className="flex gap-2">
-                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
-                <span>
-                  <span className="text-white">{title}</span>
-                  <span className="block text-[12px] text-[var(--text-3)]">{body}</span>
-                </span>
+              ["01", "Holdings vs the share", "each xStock, its gap, and what closing it is worth"],
+              ["02", "Limit orders at a gap", "open orders, distance to fill, cancel"],
+              ["03", "Activity & P&L", "latest trades from chain, entry prices you can trust"],
+            ].map(([n, title, body]) => (
+              <li key={title} className="rounded-[12px] border border-white/[0.07] bg-white/[0.02] p-3.5">
+                <span className="mono text-[11px] text-[var(--accent-2)]">{n}</span>
+                <span className="mt-1.5 block text-[13px] font-medium text-white">{title}</span>
+                <span className="mt-1 block text-[12px] leading-snug text-[var(--text-3)]">{body}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="flex flex-col gap-2 lg:w-[360px]">
+        <div className="flex flex-col justify-center gap-3 border-t border-white/[0.07] bg-black/20 p-6 sm:p-8 lg:border-t-0 lg:border-l">
           <WalletButton size="lg" full label="Connect wallet" />
+          <div className="mono my-1 flex items-center gap-3 text-[10.5px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+            <span className="h-px flex-1 bg-white/[0.08]" />
+            or watch an address
+            <span className="h-px flex-1 bg-white/[0.08]" />
+          </div>
           <WatchForm onWatch={watch} />
           <button
             type="button"
             onClick={() => watch(EXAMPLE_WALLET.address)}
-            className="self-start text-[12px] text-[var(--accent)] underline-offset-2 hover:underline"
+            className="btn-glass group mt-1 flex h-11 items-center justify-between rounded-[var(--radius-sm)] px-4 text-[13px] text-white"
           >
-            Or see a live example: the {EXAMPLE_WALLET.label}’s real xStocks →
+            <span>
+              See a live portfolio <span className="text-[var(--text-3)]">· {EXAMPLE_WALLET.label}</span>
+            </span>
+            <span className="transition-transform group-hover:translate-x-1">→</span>
           </button>
+          <p className="mono mt-1 text-[10.5px] text-[var(--text-3)]">Read-only · nothing is signed · keys never leave your wallet</p>
         </div>
       </div>
     );
@@ -331,7 +342,7 @@ export function Portfolio({
             <button
               type="button"
               onClick={() => onTrade(entry.ticker, "buy")}
-              className="h-8 rounded-[var(--radius-sm)] bg-[var(--accent)] px-3 text-[13px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+              className="h-8 rounded-[var(--radius-sm)] btn-electric px-3 text-[13px] font-medium text-white"
             >
               Buy {entry.tokenTicker}
             </button>
@@ -543,7 +554,7 @@ function WatchForm({ onWatch }: { onWatch: (address: string) => boolean }) {
   };
 
   return (
-    <form onSubmit={submit} className="flex w-full max-w-[420px] flex-col gap-1 sm:w-auto">
+    <form onSubmit={submit} className="flex w-full flex-col gap-1">
       <div className="flex gap-1.5">
         <input
           value={value}
@@ -556,7 +567,7 @@ function WatchForm({ onWatch }: { onWatch: (address: string) => boolean }) {
           aria-invalid={invalid}
           spellCheck={false}
           autoComplete="off"
-          className={`num h-8 min-w-0 flex-1 rounded-[var(--radius-sm)] border bg-[var(--bg)] px-2.5 text-[12px] outline-none sm:w-[300px] ${
+          className={`num h-11 min-w-0 flex-1 rounded-[var(--radius-sm)] border bg-black/40 px-3 text-[13px] outline-none transition-colors focus:border-[var(--accent)] ${
             invalid
               ? "border-[var(--up)]"
               : "border-[var(--border-strong)] focus:border-[var(--accent)]"
@@ -564,18 +575,12 @@ function WatchForm({ onWatch }: { onWatch: (address: string) => boolean }) {
         />
         <button
           type="submit"
-          className="h-8 shrink-0 rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-3 text-[12px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--raised)] hover:text-white"
+          className="btn-glass h-11 shrink-0 rounded-[var(--radius-sm)] px-4 text-[13px] font-medium text-white"
         >
           View
         </button>
       </div>
-      <span className="text-[11px] text-[var(--text-3)]">
-        {invalid ? (
-          <span className="text-[var(--up)]">That is not a valid Solana address.</span>
-        ) : (
-          "Read-only · nothing is signed"
-        )}
-      </span>
+      {invalid && <span className="text-[11px] text-[var(--up)]">That is not a valid Solana address.</span>}
     </form>
   );
 }
@@ -888,7 +893,7 @@ function RowAction({
       onClick={onClick}
       className={`h-7 rounded-[var(--radius-sm)] px-2.5 text-[12px] font-medium transition-colors ${
         lead
-          ? "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
+          ? "btn-electric text-white"
           : "border border-[var(--border-strong)] text-[var(--text-2)] hover:bg-[var(--raised)] hover:text-white"
       }`}
     >

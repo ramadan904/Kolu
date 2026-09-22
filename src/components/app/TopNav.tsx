@@ -43,7 +43,7 @@ export function TopNav({ compact = false }: { compact?: boolean }) {
             {on && (
               <span
                 aria-hidden="true"
-                className={`absolute left-3 right-3 h-[2px] rounded-full bg-[var(--accent)] ${
+                className={`absolute left-3 right-3 h-[2px] rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_12px_var(--glow)] ${
                   compact ? "-bottom-[9px]" : "-bottom-[13px]"
                 }`}
               />

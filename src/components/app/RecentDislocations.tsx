@@ -16,7 +16,7 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
   return (
     <section className="panel mb-5 overflow-hidden" aria-labelledby="recent-dislocations">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-        <h2 id="recent-dislocations" className="text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+        <h2 id="recent-dislocations" className="eyebrow ">
           Recent dislocations
         </h2>
         <span className="text-[12px] text-[var(--text-3)]">

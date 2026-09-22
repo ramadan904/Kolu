@@ -251,6 +251,7 @@ export function BasisChart({
           strokeOpacity={real ? 1 : 0.4}
           strokeDasharray={real ? undefined : "4 3"}
           strokeWidth={real ? 1.75 : 1.5}
+          style={{ filter: `drop-shadow(0 0 5px ${stroke})` }}
           strokeLinejoin="round"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"

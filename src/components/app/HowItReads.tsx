@@ -64,7 +64,7 @@ export function HowItReads({
 
   return (
     <section className="mb-5" aria-labelledby="how-it-reads">
-      <h2 id="how-it-reads" className="mb-3 text-[13px] uppercase tracking-[0.07em] text-[var(--text-3)]">
+      <h2 id="how-it-reads" className="eyebrow mb-3 ">
         How Kolu reads a gap
       </h2>
       <div className="grid gap-3 md:grid-cols-3">
@@ -76,7 +76,7 @@ export function HowItReads({
               </span>
               {s.title}
             </div>
-            <div className="display mt-3 text-[28px] leading-none">{s.value}</div>
+            <div className="display text-electric mt-3 text-[34px] leading-none">{s.value}</div>
             <div className="mt-1 text-[12px] text-[var(--text-3)]">{s.caption}</div>
             <p className="mt-3 text-[13px] leading-relaxed text-[var(--text-2)]">{s.body}</p>
           </div>

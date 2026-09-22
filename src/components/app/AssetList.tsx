@@ -5,6 +5,7 @@ import { computeEdge, DEFAULT_COSTS } from "@/lib/basis/edge";
 import { formatAge } from "@/lib/basis/compute";
 import { fmtBps, fmtPct, fmtUsd } from "@/lib/format";
 import { Dot } from "@/components/ui/Badge";
+import { useFlash } from "./useFlash";
 
 const SIGNAL_LABEL: Record<BasisReading["signal"], string> = {
   actionable: "Live gap",
@@ -14,18 +15,24 @@ const SIGNAL_LABEL: Record<BasisReading["signal"], string> = {
   unavailable: "No data",
 };
 
-function GapBar({ bps, domain }: { bps: number; domain: number }) {
+function GapBar({ bps, domain, muted = false }: { bps: number; domain: number; muted?: boolean }) {
   const pct = Math.min(Math.abs(bps) / domain, 1) * 50;
   const discount = bps < 0;
   return (
-    <div className="relative h-1 w-full" aria-hidden="true">
-      <div className="absolute inset-y-0 left-1/2 w-px bg-[var(--border-strong)]" />
+    <div className="relative h-1.5 w-full rounded-full bg-white/[0.04]" aria-hidden="true">
+      <div className="absolute -inset-y-0.5 left-1/2 w-px bg-[var(--border-strong)]" />
       <div
-        className="absolute top-0 h-1 rounded-full"
+        className="absolute top-0 h-1.5 rounded-full transition-all duration-700"
         style={{
           left: discount ? `${50 - pct}%` : "50%",
           width: `${Math.max(pct, 0.5)}%`,
-          background: discount ? "var(--down)" : "var(--up)",
+          // Colour and light mean signal: a gap inside the noise stays grey.
+          background: muted
+            ? "rgba(255,255,255,0.22)"
+            : discount
+              ? "linear-gradient(270deg, var(--down), var(--down-2))"
+              : "linear-gradient(90deg, var(--up), var(--up-2))",
+          boxShadow: muted ? undefined : `0 0 10px ${discount ? "rgba(25,209,143,0.55)" : "rgba(255,77,106,0.55)"}`,
         }}
       />
     </div>
@@ -49,7 +56,7 @@ export function AssetList({
 
   return (
     <div className="panel overflow-hidden">
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-2.5 text-[11px] uppercase tracking-[0.07em] text-[var(--text-3)] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5">
+      <div className="mono grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] bg-white/[0.015] px-4 py-2.5 text-[10.5px] uppercase tracking-[0.08em] text-[var(--text-3)] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5">
         <span>Asset</span>
         <span className="hidden text-right sm:block">Token</span>
         <span className="hidden text-right sm:block">Real share</span>
@@ -81,9 +88,16 @@ export function AssetList({
                 type="button"
                 onClick={() => onSelect(r.ticker)}
                 aria-expanded={isSelected}
-                className={`group grid w-full grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--raised)] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5 ${isSelected ? "bg-[var(--raised)]" : ""}`}
+                className={`group relative grid w-full grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3.5 text-left transition-colors duration-200 last:border-b-0 hover:bg-white/[0.03] sm:grid-cols-[1.4fr_1fr_1fr_1.1fr_0.9fr] sm:px-5 ${isSelected ? "bg-white/[0.04]" : ""}`}
               >
-                <span className="min-w-0">
+                {/* The row being pointed at is lit from its edge. */}
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-y-2 left-0 w-[2px] rounded-full bg-gradient-to-b from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_10px_var(--glow)] transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                />
+                <span className="flex min-w-0 items-center gap-3">
+                  <Monogram ticker={r.tokenTicker} tone={missing || muted ? "muted" : discount ? "down" : "up"} />
+                  <span className="min-w-0">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium">{r.tokenTicker}</span>
                     {r.signal === "degraded_feed" && <Dot tone="warn" />}
@@ -109,10 +123,11 @@ export function AssetList({
                       <span>· {formatAge(r.referenceAgeSeconds)} old</span>
                     )}
                   </span>
+                  </span>
                 </span>
 
-                <span className="num hidden text-right text-[14px] sm:block">
-                  {r.token ? fmtUsd(r.token.price) : "—"}
+                <span className="hidden text-right sm:block">
+                  <TickingPrice value={r.token?.price ?? null} />
                 </span>
                 <span className="num hidden text-right text-[14px] text-[var(--text-2)] sm:block">
                   {r.equity ? fmtUsd(r.equity.price) : "—"}
@@ -135,7 +150,7 @@ export function AssetList({
                   </span>
                   {!missing && (
                     <span className="mt-1.5 block">
-                      <GapBar bps={r.basisBps!} domain={domain} />
+                      <GapBar bps={r.basisBps!} domain={domain} muted={muted} />
                     </span>
                   )}
                 </span>
@@ -174,5 +189,28 @@ export function AssetList({
         })}
       </ul>
     </div>
+  );
+}
+
+/** A price that washes green or red for a moment when it ticks. */
+function TickingPrice({ value }: { value: number | null }) {
+  const flash = useFlash(value);
+  return <span className={`num inline-block px-1 text-[14px] ${flash}`}>{value !== null ? fmtUsd(value) : "—"}</span>;
+}
+
+/** The pair's mark: its ticker's letters on a tile tinted by the gap's direction. */
+function Monogram({ ticker, tone }: { ticker: string; tone: "down" | "up" | "muted" }) {
+  const c = tone === "down" ? "25,209,143" : tone === "up" ? "255,77,106" : "150,153,166";
+  return (
+    <span
+      aria-hidden="true"
+      className="mono flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] text-[11px] font-medium text-white/90 transition-transform duration-200 group-hover:scale-105"
+      style={{
+        background: `linear-gradient(145deg, rgba(${c},0.22), rgba(${c},0.04))`,
+        boxShadow: `inset 0 0 0 1px rgba(${c},0.28), inset 0 1px 0 rgba(255,255,255,0.08)`,
+      }}
+    >
+      {ticker.replace(/X$/, "").slice(0, 4)}
+    </span>
   );
 }
