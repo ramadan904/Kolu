@@ -9,7 +9,7 @@ after costs, and tells you whether it can be hedged or only bet on.
 
 Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
 
-**[Open the live board](#)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
+**[Open the live board](https://kolu-ramrex904-5914.vercel.app)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
 
 ---
 

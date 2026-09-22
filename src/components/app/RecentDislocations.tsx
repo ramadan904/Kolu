@@ -33,8 +33,6 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
     };
   }, []);
 
-  const max = Math.max(1, ...(rows ?? []).map((r) => Math.abs(r.basisBps)));
-
   return (
     <section className="panel mb-5 overflow-hidden" aria-labelledby="recent-dislocations">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
@@ -42,7 +40,7 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
           Recent dislocations
         </h2>
         <span className="text-[12px] text-[var(--text-3)]">
-          Widest real gap per pair, last 48h
+          Widest real gap per pair, hourly median, last 48h
           {breakeven !== null && <> · a $10k trade needs {breakeven}bps to pay</>}
         </span>
       </div>
@@ -74,17 +72,8 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
                     <span className="text-[14px] font-medium">{r.tokenTicker}</span>
                     <span className="ml-2 text-[12px] text-[var(--text-3)] sm:hidden">{r.name}</span>
                   </span>
-                  <span className="hidden items-center gap-3 sm:flex">
-                    <span className="relative h-1.5 flex-1 rounded-full bg-[var(--raised)]">
-                      <span
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{
-                          width: `${(Math.abs(r.basisBps) / max) * 100}%`,
-                          background: rich ? "var(--up)" : "var(--down)",
-                          opacity: r.clearedCosts ? 1 : 0.55,
-                        }}
-                      />
-                    </span>
+                  <span className="hidden sm:block">
+                    <Spark row={r} />
                   </span>
                   <span className="num text-right text-[14px] sm:text-left" style={{ color: rich ? "var(--up)" : "var(--down)" }}>
                     {fmtBps(r.basisBps, 0)}
@@ -106,5 +95,43 @@ export function RecentDislocations({ onSelect }: { onSelect: (ticker: string) =>
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The pair's 48h in 32px: hourly median gap, shut hours shaded, the widest
+ * moment marked. Every row shares a scale, so the rows compare at a glance.
+ */
+function Spark({ row }: { row: Dislocation }) {
+  const W = 320;
+  const H = 32;
+  const pts = row.spark;
+  if (pts.length < 2) return null;
+  const t0 = pts[0][0];
+  const span = Math.max(pts[pts.length - 1][0] - t0, 1);
+  const lim = Math.max(40, ...pts.map((p) => Math.abs(p[1])));
+  const x = (t: number) => ((t - t0) / span) * W;
+  const y = (b: number) => H / 2 - (b / lim) * (H / 2 - 2);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
+  const shut: { x0: number; x1: number }[] = [];
+  let start: number | null = null;
+  pts.forEach((p, i) => {
+    if (p[2] && start === null) start = p[0];
+    if (start !== null && (!p[2] || i === pts.length - 1)) {
+      shut.push({ x0: x(start), x1: x(p[0]) });
+      start = null;
+    }
+  });
+  const peak = pts.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a));
+  const color = row.basisBps > 0 ? "var(--up)" : "var(--down)";
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-8 w-full" aria-hidden="true">
+      {shut.map((b, i) => (
+        <rect key={i} x={b.x0} y={0} width={Math.max(b.x1 - b.x0, 1)} height={H} fill="rgba(255,255,255,0.035)" />
+      ))}
+      <line x1={0} x2={W} y1={H / 2} y2={H / 2} stroke="rgba(255,255,255,0.1)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <path d={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(peak[0])} cy={y(peak[1])} r={2.5} fill={color} />
+    </svg>
   );
 }

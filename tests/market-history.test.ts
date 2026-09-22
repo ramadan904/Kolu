@@ -50,3 +50,22 @@ describe("gapContext", () => {
     expect(gapContext(mk([1, 2, 3], "regular"), 2)).toBeNull();
   });
 });
+
+describe("rollingMedian / downsample", () => {
+  const pts = [0, 0, 200, 0, 0, 10, 10, 10].map((b, i) => ({ t: i * 900_000, basisBps: b, phase: "regular" as const }));
+
+  it("ignores a lone off-book print that a mean would chase", async () => {
+    const { rollingMedian } = await import("@/lib/data/market-history");
+    const m = rollingMedian(pts, 4);
+    expect(m[2].basisBps).toBe(0);
+    expect(m).toHaveLength(pts.length);
+  });
+
+  it("buckets to one median point per hour", async () => {
+    const { downsample } = await import("@/lib/data/market-history");
+    const d = downsample(pts, 3600_000);
+    expect(d).toHaveLength(2);
+    expect(d[0].basisBps).toBe(0); // [0,0,200,0]
+    expect(d[1].basisBps).toBe(10); // [0,10,10,10] -> 10
+  });
+});

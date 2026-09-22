@@ -199,3 +199,42 @@ export function gapContext(points: HistoryPoint[], currentBps: number): GapConte
     typicalShutBps: median(points.filter((p) => shut.has(p.phase)).map((p) => Math.abs(p.basisBps))),
   };
 }
+
+/**
+ * Rolling median over `window` points, centred. Thin pools print single trades
+ * well off the book, so 15-minute closes bounce by tens of bps; a median keeps
+ * the shape (widening while shut, snapping back at the open) and ignores the
+ * lone prints, where a mean would be dragged by them.
+ */
+export function rollingMedian(points: HistoryPoint[], window = 4): HistoryPoint[] {
+  const half = Math.floor(window / 2);
+  return points.map((p, i) => {
+    const slice = points.slice(Math.max(0, i - half), Math.min(points.length, i + half + 1)).map((q) => q.basisBps);
+    slice.sort((a, b) => a - b);
+    const m = Math.floor(slice.length / 2);
+    const basisBps = slice.length % 2 ? slice[m] : (slice[m - 1] + slice[m]) / 2;
+    return { ...p, basisBps };
+  });
+}
+
+/** One point per `bucketMs`: the median of that bucket, with its session. */
+export function downsample(points: HistoryPoint[], bucketMs = 3600_000): HistoryPoint[] {
+  const buckets = new Map<number, HistoryPoint[]>();
+  for (const p of points) {
+    const k = Math.floor(p.t / bucketMs);
+    const list = buckets.get(k) ?? [];
+    list.push(p);
+    buckets.set(k, list);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([k, list]) => {
+      const vals = list.map((p) => p.basisBps).sort((a, b) => a - b);
+      const m = Math.floor(vals.length / 2);
+      return {
+        t: k * bucketMs + bucketMs / 2,
+        basisBps: vals.length % 2 ? vals[m] : (vals[m - 1] + vals[m]) / 2,
+        phase: list[Math.floor(list.length / 2)].phase,
+      };
+    });
+}

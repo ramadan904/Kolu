@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { breakevenBps } from "@/lib/basis/edge";
-import { realHistory } from "@/lib/data/market-history";
+import { downsample, realHistory } from "@/lib/data/market-history";
 import type { SessionPhase } from "@/lib/market/session";
 import { loadMints } from "@/lib/mints";
 import { CORE_UNIVERSE } from "@/lib/universe";
@@ -11,14 +11,18 @@ export interface Dislocation {
   ticker: string;
   tokenTicker: string;
   name: string;
-  /** The widest gap this pair showed in the window, signed. */
+  /** The widest hourly-median gap this pair showed in the window, signed. */
   basisBps: number;
   /** When it happened, unix ms. */
   t: number;
   phase: SessionPhase;
   /** Whether a $10k round trip at that gap would have cleared modelled costs. */
   clearedCosts: boolean;
+  /** Hourly medians over the window, for a sparkline: [unix ms, bps, shut?]. */
+  spark: [number, number, boolean][];
 }
+
+const SHUT = new Set<SessionPhase>(["closed", "weekend", "holiday"]);
 
 /**
  * The widest real gap each liquid pair showed in the last 48h, from its pool
@@ -39,7 +43,10 @@ export async function GET() {
       missing += 1;
       continue;
     }
-    const widest = points.reduce((a, b) => (Math.abs(b.basisBps) > Math.abs(a.basisBps) ? b : a));
+    // Widest hourly median, not widest single print: a thin pool's lone
+    // off-book trade is not a gap anyone could have traded.
+    const hourly = downsample(points);
+    const widest = hourly.reduce((a, b) => (Math.abs(b.basisBps) > Math.abs(a.basisBps) ? b : a));
     out.push({
       ticker: entry.ticker,
       tokenTicker: entry.tokenTicker,
@@ -48,6 +55,7 @@ export async function GET() {
       t: widest.t,
       phase: widest.phase,
       clearedCosts: Math.abs(widest.basisBps) >= breakeven,
+      spark: hourly.map((p) => [p.t, Math.round(p.basisBps * 10) / 10, SHUT.has(p.phase)]),
     });
   }
 

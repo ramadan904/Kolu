@@ -131,7 +131,7 @@ armed at the break-even gap for a $10k trade. "It never fires on noise or on a
 stalled feed; one false alarm at 3am gets the feature muted."
 
 **2:20 — The close.** "Live prices, live routes, verified mints, a swap that
-can't be reported as filled when it reverted. 185 tests. Every view is a link —
+can't be reported as filled when it reverted. 199 tests. Every view is a link —
 this one opens the ticket." Copy link from the ticket; cut to the repo.
 
 ---
@@ -147,7 +147,7 @@ closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. A wallet trade flow — live Jupiter quote, wallet signature,
 polled confirmation that never reports a reverted swap as filled — and a
 positions view that values any Solana address's real xStock holdings against
-the live gaps. 185 tests. Falls back to labelled demo data when the live source
+the live gaps. 199 tests. Falls back to labelled demo data when the live source
 is unreachable.
 
 **Live, unauthenticated:** Pyth symbol resolution. All 24 symbols — twelve
@@ -186,10 +186,10 @@ so a leftover placeholder is dropped rather than handed to a router.
 
 ## Links
 
-- **Live:** https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app
-- **Straight to it:** [replay a dislocation](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?replay=1) ·
-  [a live portfolio](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?view=example) · [a TSLAX ticket](https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/?trade=TSLA)
-- **Health:** https://kolu-git-claude-beautiful-maxwell-i64akh-ramrex904-5914.vercel.app/api/health
+- **Live:** https://kolu-ramrex904-5914.vercel.app
+- **Straight to it:** [replay a dislocation](https://kolu-ramrex904-5914.vercel.app/?replay=1) ·
+  [a live portfolio](https://kolu-ramrex904-5914.vercel.app/?view=example) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
+- **Health:** https://kolu-ramrex904-5914.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu
 - **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC for the board; set `SOLANA_RPC_URL` to trade
 

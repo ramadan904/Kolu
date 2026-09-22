@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BasisReading } from "@/lib/basis/compute";
 import type { HistorySeries } from "@/lib/history";
 import type { SessionPhase } from "@/lib/market/session";
-import { gapContext } from "@/lib/data/market-history";
+import { downsample, gapContext } from "@/lib/data/market-history";
 import { fmtBps } from "@/lib/format";
 import { BasisChart } from "./BasisChart";
 
@@ -74,7 +74,8 @@ export function GapHistory({
   const real = series?.source === "market" && series.ticker === active;
   const stats = useMemo(() => {
     if (!real || !series || series.points.length === 0) return null;
-    const widest = series.points.reduce((a, b) => (Math.abs(b.basisBps) > Math.abs(a.basisBps) ? b : a));
+    // Hourly median, as the chart's main line: a lone print is not a gap.
+    const widest = downsample(series.points).reduce((a, b) => (Math.abs(b.basisBps) > Math.abs(a.basisBps) ? b : a));
     const ctx = reading?.basisBps != null ? gapContext(series.points, reading.basisBps) : null;
     return { widest, ctx };
   }, [real, series, reading?.basisBps]);
@@ -127,7 +128,7 @@ export function GapHistory({
               </span>
             )}
           </Fact>
-          <Fact label="Widest in 48h">
+          <Fact label="Widest hour in 48h">
             {stats ? (
               <>
                 <span className="num text-white">{fmtBps(stats.widest.basisBps, 0)}</span>

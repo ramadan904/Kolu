@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { HistoryPoint, HistorySeries } from "@/lib/history";
+import { rollingMedian } from "@/lib/data/market-history";
 import { basisDomain } from "@/lib/chart-scale";
 import { fmtBps } from "@/lib/format";
 import { SESSION_COPY } from "@/lib/market/session";
@@ -36,8 +37,12 @@ export function BasisChart({
   const [hover, setHover] = useState<number | null>(null);
 
   const model = useMemo(() => {
-    const pts = series.points;
-    if (pts.length < 2) return null;
+    const raw = series.points;
+    if (raw.length < 2) return null;
+    // Real trades are drawn two ways: each 15-minute close, faint, and the
+    // hourly median over them as the line you read. Thin pools print lone
+    // trades far off the book; the median keeps the shape and drops those.
+    const pts = series.source === "market" ? rollingMedian(raw, 4) : raw;
 
     const t0 = pts[0].t;
     const span = Math.max(pts[pts.length - 1].t - t0, 1);
@@ -79,8 +84,19 @@ export function BasisChart({
             .join(" ")
         : null;
 
-    return { pts, x, y, line, bands, dom, observedLine, seenCount: seen.length };
-  }, [series.points, observed]);
+    const rawLine =
+      series.source === "market"
+        ? raw
+            .map((p, i) => {
+              // Clamp spikes to the plot so the faint layer never escapes it.
+              const b = Math.max(dom.min, Math.min(dom.max, p.basisBps));
+              return `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(b).toFixed(1)}`;
+            })
+            .join(" ")
+        : null;
+
+    return { pts, x, y, line, rawLine, bands, dom, observedLine, seenCount: seen.length };
+  }, [series.points, series.source, observed]);
 
   if (!model) {
     return (
@@ -92,7 +108,7 @@ export function BasisChart({
     );
   }
 
-  const { pts, x, y, line, bands, dom, observedLine, seenCount } = model;
+  const { pts, x, y, line, rawLine, bands, dom, observedLine, seenCount } = model;
   const last = pts[pts.length - 1];
   const stroke = last.basisBps < 0 ? "var(--down)" : "var(--up)";
   const active = hover === null ? null : pts[hover];
@@ -130,8 +146,16 @@ export function BasisChart({
                 stroke="currentColor" strokeWidth="1.5" strokeDasharray={real ? undefined : "3 2"}
               />
             </svg>
-            {real ? "real · pool trades vs exchange prints" : "modelled"}
+            {real ? "real · hourly median" : "modelled"}
           </span>
+          {real && (
+            <span className="flex items-center gap-1.5 normal-case tracking-normal">
+              <svg width="14" height="6" aria-hidden="true">
+                <line x1="0" y1="3" x2="14" y2="3" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+              </svg>
+              15-min trades
+            </span>
+          )}
           {seenCount >= 2 && (
             <span className="flex items-center gap-1.5 normal-case tracking-normal">
               <svg width="14" height="6" aria-hidden="true">
@@ -151,7 +175,7 @@ export function BasisChart({
                 hour12: false,
               })} ET · ${fmtBps(active.basisBps, 1)} · ${SESSION_COPY[active.phase]}`
             : real
-              ? "Token's on-chain trades vs the real share's last print, every 15 min"
+              ? "Token's on-chain trades vs the real share's last print"
               : seenCount >= 2
                 ? `${seenCount} readings observed in this browser`
                 : "Modelled shape — real readings appear as you watch"}
@@ -201,6 +225,18 @@ export function BasisChart({
             </text>
           </g>
         ))}
+
+        {rawLine && (
+          <path
+            d={rawLine}
+            fill="none"
+            stroke={stroke}
+            strokeOpacity={0.22}
+            strokeWidth={1}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
 
         {/* Modelled context is dashed and dimmed, so it cannot be mistaken for
             a reading anyone took; real history is drawn solid. */}
