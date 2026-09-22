@@ -134,7 +134,9 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
             aria-label="Search commands"
             aria-controls="palette-results"
             aria-activedescendant={results[active] ? `cmd-${results[active].id}` : undefined}
-            className="h-12 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-[var(--text-3)]"
+            className="h-12 flex-1 bg-transparent text-[14px] text-white placeholder:text-[var(--text-3)]"
+            // The palette is the focus context; the site-wide ring would clip its edge.
+            style={{ outline: "none" }}
           />
           <kbd className="rounded-[4px] border border-[var(--border)] px-1.5 text-[11px] text-[var(--text-3)]">esc</kbd>
         </div>
