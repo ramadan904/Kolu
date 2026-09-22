@@ -540,10 +540,11 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         <h2 className="eyebrow ">
           All tracked pairs
         </h2>
-        <span className="mono ml-3 mr-auto hidden text-[11px] text-[var(--text-3)] sm:inline">
-          {/* A judge should not have to click "All" to learn the universe is twelve. */}
+        {/* A judge should not have to click "All" to learn the universe is twelve. */}
+        <span className="mono ml-2.5 mr-auto text-[10.5px] text-[var(--text-3)] sm:ml-3 sm:text-[11px]">
           <span className="text-white">{CORE_UNIVERSE.length}</span> liquid ·{" "}
-          <span className="text-white">{UNIVERSE.length}</span> pairs verified on both legs
+          <span className="text-white">{UNIVERSE.length}</span> verified
+          <span className="hidden sm:inline"> on both legs</span>
         </span>
         <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] p-0.5">
           {(["core", "all"] as const).map((t) => (
