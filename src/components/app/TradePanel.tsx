@@ -23,6 +23,8 @@ import { pollConfirmation } from "@/lib/confirm";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
 import { LimitOrder } from "./LimitOrder";
+import { useDislocations } from "./useDislocations";
+import { NARROWED_PCT } from "@/lib/data/market-history";
 
 export type Side = "buy" | "sell";
 type Unit = "usd" | "token";
@@ -134,6 +136,9 @@ export function TradePanel({
   const { publicKey, signTransaction, connected } = useWallet();
   const { connection } = useConnection();
   const { balances, loading: loadingBalances, error: balanceError } = useBalances();
+  // This pair's record at the open, last week: what a closed-market trade is betting on.
+  const { rows: dislocations } = useDislocations();
+  const opens = dislocations?.find((d) => d.ticker === reading.ticker)?.opens ?? [];
 
   const gapSide = sideForGap(reading.basisBps);
   const hasGap = reading.basisBps !== null && reading.basisBps !== 0;
@@ -572,9 +577,18 @@ export function TradePanel({
               ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim()
               : [
                   verdict.body,
-                  typical
-                    ? `Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut.`
-                    : "",
+                  [
+                    typical
+                      ? `Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut`
+                      : "",
+                    // A closed-market trade is a bet on the open; say how that bet has gone.
+                    !hedgeable && gapIsSignal && opens.length > 0
+                      ? `${typical ? "l" : `${reading.tokenTicker}: l`}ast week the gap narrowed at ${opens.filter((e) => e.closedPct >= NARROWED_PCT).length} of ${opens.length} opens`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("; ")
+                    .replace(/.$/, (c) => `${c}.`),
                   // Nothing pays now: point at the tool that waits for it.
                   mode === "now" && (verdict.tone === "bad" || verdict.tone === "neutral")
                     ? "Or set a limit at a gap and let it fill when one opens."

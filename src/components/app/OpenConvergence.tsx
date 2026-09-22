@@ -1,11 +1,8 @@
 "use client";
 
-import type { OpenEvent } from "@/lib/data/market-history";
+import { NARROWED_PCT, type OpenEvent } from "@/lib/data/market-history";
 import { etDay as day } from "./GapHistory";
 import { useDislocations } from "./useDislocations";
-
-/** A gap counts as having closed at the open once at least a quarter of it is gone. */
-const NARROWED_PCT = 25;
 
 const medianOf = (xs: number[]) => {
   if (xs.length === 0) return null;

@@ -267,6 +267,9 @@ export interface OpenEvent {
   closedPct: number;
 }
 
+/** An open counts as having closed the gap once at least a quarter of it is gone. */
+export const NARROWED_PCT = 25;
+
 /** Below this the pre-open gap is noise, and "how much closed" means nothing. */
 export const MIN_OPEN_GAP_BPS = 15;
 
