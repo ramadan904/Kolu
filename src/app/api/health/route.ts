@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rpcHost as upstreamHost, rpcUpstreams } from "@/lib/rpc-upstreams";
 import { ASSUMED_BAND_BPS } from "@/lib/basis/band";
 import { NOISE_MULTIPLE } from "@/lib/basis/compute";
 import { buildBoard } from "@/lib/board";
@@ -127,6 +128,9 @@ export async function GET() {
         // a dedicated provider's URL carries its API key.
         walletRpc: process.env.SOLANA_RPC_URL ? "dedicated" : "public (rate-limited)",
         walletRpcHost: rpcHost(process.env.SOLANA_RPC_URL),
+        // The whole chain the relay will try, in order. Hosts only: a
+        // dedicated provider's URL carries its key.
+        walletRpcChain: rpcUpstreams().map(upstreamHost),
       },
       build: {
         commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
