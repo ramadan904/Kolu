@@ -141,7 +141,8 @@ any pair's ticket or 7-day chart with its live gap, every section, replay, the
 example portfolio, alerts, copy link.
 
 **Alerts that respect your sleep.** Arm a threshold per ticker and Kolu watches
-for you, in-page and via browser notification. What matters is what it refuses
+for you, in-page and via browser notification while the tab is open — a limit
+order is the one that works with Kolu closed. What matters is what it refuses
 to fire on: a gap inside the oracle noise floor, or one measured against a feed
 that has stopped ticking, never alerts. A stalled reference manufactures an
 arbitrarily large apparent basis, and waking someone at 3am for a data outage

@@ -102,19 +102,21 @@ export function AlertControl({
           onClick={onRequestPermission}
           className="mt-3 text-[12px] text-[var(--accent)] hover:underline"
         >
-          Allow notifications so alerts reach you with the tab closed
+          Allow notifications so alerts reach you on another tab
         </button>
       )}
       {permission === "denied" && (
         <p className="mt-3 text-[12px] text-[var(--text-3)]">
-          Notifications are blocked, so alerts only appear here while this tab is open.
+          Notifications are blocked, so alerts appear here rather than on your desktop. Either way Kolu
+          has to be open: it watches from this page, not from a server.
         </p>
       )}
 
       <p className="mt-3 max-w-md text-[12px] leading-relaxed text-[var(--text-3)]">
         Alerts never fire on a gap inside the noise floor, or on one
         measured against a feed that has stopped ticking. A false alarm at 3am costs
-        more than a missed one.
+        more than a missed one. Kolu watches from this page, so leave the tab open —
+        for a gap to be acted on while you sleep, place a limit order instead.
       </p>
     </div>
   );
