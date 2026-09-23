@@ -87,7 +87,7 @@ export function Hero({
     const closesIn = timeUntilClose(session);
     const stalled = session.isRegularHours && delayed > 0;
     return (
-      <section className="relative grid gap-10 py-12 sm:py-16 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:gap-12">
+      <section className="relative grid gap-10 pt-10 pb-12 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:gap-12">
         <div className="rise min-w-0">
         <span className="eyebrow">
           {stalled ? "Market open · reference delayed" : session.isRegularHours ? "Market open · tracking tight" : "Nothing dislocated"}
@@ -191,7 +191,7 @@ function Dislocation({
   const pays = edge.netBps > 0;
 
   return (
-    <section className="relative grid gap-10 py-12 sm:py-14 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:gap-12">
+    <section className="relative grid gap-10 pt-10 pb-12 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:gap-12">
       <div className="rise min-w-0">
         <div className="flex flex-wrap items-center gap-3">
           <span className="eyebrow">Widest dislocation · {asOf ? `${asOf} ET` : "live"}</span>

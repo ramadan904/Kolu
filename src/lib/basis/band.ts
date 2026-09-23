@@ -21,6 +21,6 @@ export function bandCopy(source: PriceSourceKind): { short: string; long: string
   }
   return {
     short: `an assumed ±${ASSUMED_BAND_BPS}bps a leg`,
-    long: `Neither leg publishes a confidence interval on this deployment, so Kolu assumes ±${ASSUMED_BAND_BPS}bps a side and treats ${NOISE_MULTIPLE}× their combined width as the floor. Set PYTH_API_KEY and the real published bands are used instead.`,
+    long: `Neither leg publishes a confidence interval on this deployment, so Kolu assumes ±${ASSUMED_BAND_BPS}bps a side and treats ${NOISE_MULTIPLE}× their combined width as the floor. Set PYTH_API_KEY for the published bands.`,
   };
 }

@@ -50,6 +50,8 @@ interface ReplayInfo {
   at: number;
   label: string;
   ticker: string;
+  /** The link asked for a moment older than the window; this is the closest one on record. */
+  aged?: boolean;
 }
 
 /** Scrolls to an element once the page that holds it has rendered. */
@@ -509,6 +511,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
             <span className="mono mr-2 rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-[10.5px] uppercase tracking-[0.06em] text-white">
               Replay · real trades
             </span>
+            {replay.aged && <span className="text-white">That moment has aged out of the week Kolu keeps. </span>}
             The board as Kolu computed it on{" "}
             <span className="text-white">{replay.label} ET</span> — from the tokens&rsquo; own pool prints against the
             real shares&rsquo; last exchange prints. Every number was true then; trading is off because none of them is

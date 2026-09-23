@@ -233,7 +233,10 @@ so a leftover placeholder is dropped rather than handed to a router.
 ## Links
 
 - **Live:** https://kolu-ramrex904-5914.vercel.app
-- **Straight to it:** [replay the week's widest real gap](https://kolu-ramrex904-5914.vercel.app/?replay=1) ·
+- **Straight to it:** [replay the week's widest real gap](https://kolu-ramrex904-5914.vercel.app/?replay=1)
+  (the exact moment in the video:
+  [AAPLX +148bps, Sat 19 Sep 06:30 ET](https://kolu-ramrex904-5914.vercel.app/?replay=real&at=1789813800000)
+  — a moment that has aged out of the window replays the closest one on record and says so) ·
   [a live portfolio](https://kolu-ramrex904-5914.vercel.app/portfolio?view=example) · [gap history](https://kolu-ramrex904-5914.vercel.app/history) · [the backtest](https://kolu-ramrex904-5914.vercel.app/backtest) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
 - **Health:** https://kolu-ramrex904-5914.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu

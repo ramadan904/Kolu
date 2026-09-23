@@ -57,10 +57,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // The moment: the one asked for, or the widest hourly-median gap of the week.
-  let at = Number.isFinite(asked) && asked > 0 ? asked : 0;
-  let headline = "";
-  if (!at) {
+  /** The widest hourly-median gap still inside the window. */
+  const widestMoment = () => {
     let widest: { t: number; bps: number; ticker: string } | null = null;
     for (const [ticker, points] of series) {
       for (const p of downsample(points)) {
@@ -69,8 +67,27 @@ export async function GET(request: Request) {
         }
       }
     }
-    at = widest!.t;
-    headline = widest!.ticker;
+    return widest;
+  };
+  /** How many pairs have a trade close enough to a moment to replay it. */
+  const coverage = (t: number) =>
+    [...series.values()].filter((points) => nearest(points, t) !== null).length;
+
+  // The moment: the one asked for, or the widest hourly-median gap of the week.
+  let at = Number.isFinite(asked) && asked > 0 ? asked : 0;
+  let headline = "";
+  let aged = false;
+  // A pinned link outlives the window it was taken from: rather than serve an
+  // empty board to someone opening a shared link a week later, fall back to the
+  // widest moment still on record and say that is what happened.
+  if (at && coverage(at) < 2) {
+    aged = true;
+    at = 0;
+  }
+  if (!at) {
+    const widest = widestMoment()!;
+    at = widest.t;
+    headline = widest.ticker;
   }
 
   const session = getMarketSession(new Date(at));
@@ -100,7 +117,7 @@ export async function GET(request: Request) {
 
   if (!headline) headline = readings[0]?.ticker ?? "";
 
-  const snapshot: BoardSnapshot & { replay: { at: number; label: string; ticker: string } } = {
+  const snapshot: BoardSnapshot & { replay: { at: number; label: string; ticker: string; aged: boolean } } = {
     generatedAt: new Date(at).toISOString(),
     session,
     source: "replay",
@@ -114,6 +131,8 @@ export async function GET(request: Request) {
     replay: {
       at,
       ticker: headline,
+      /** True when the link asked for a moment that has aged out of the window. */
+      aged,
       label: new Date(at).toLocaleString("en-US", {
         timeZone: "America/New_York",
         weekday: "short",
