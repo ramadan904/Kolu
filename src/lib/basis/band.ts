@@ -4,7 +4,7 @@ import { ASSUMED_CONFIDENCE_FRACTION } from "../data/jupiter-prices";
 /** The assumed band per leg when the serving source publishes none, in bps. */
 export const ASSUMED_BAND_BPS = Math.round(ASSUMED_CONFIDENCE_FRACTION * 10_000);
 
-export type PriceSourceKind = "pyth" | "jupiter" | "fixture";
+export type PriceSourceKind = "pyth" | "jupiter" | "fixture" | "replay";
 
 /**
  * What the noise floor actually is, said accurately for whichever source is

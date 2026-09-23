@@ -61,7 +61,7 @@ export function FirstVisit({
       className="panel mt-4 flex flex-col gap-1 p-1.5 sm:flex-row sm:items-stretch"
       aria-label="Things to try"
     >
-      {step(1, "Replay a dislocation", "See Kolu recommend a trade that pays", onReplay)}
+      {step(1, "Replay a real dislocation", "The widest real gap of the week, as Kolu read it", onReplay)}
       {step(2, "See a live portfolio", "A public wallet's real xStocks, read-only", onExample)}
       {step(3, "Dry-run a trade", "Simulate the exact swap on mainnet", onTicket)}
       <button

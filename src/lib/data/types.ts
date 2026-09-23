@@ -14,7 +14,8 @@ export interface PriceReading {
   confidence: number;
   /** Unix seconds when the publishers agreed this price. */
   publishTime: number;
-  source: "pyth" | "jupiter" | "fixture";
+  /** "market" is a recorded trade replayed from history, not a live feed. */
+  source: "pyth" | "jupiter" | "fixture" | "market";
 }
 
 export interface FeedDescriptor {

@@ -45,6 +45,13 @@ import { EXAMPLE_WALLET } from "@/lib/known-wallets";
 
 const POLL_MS = 10_000;
 
+/** A replayed moment, as the replay route describes it. */
+interface ReplayInfo {
+  at: number;
+  label: string;
+  ticker: string;
+}
+
 /** Scrolls to an element once the page that holds it has rendered. */
 function scrollWhenReady(id: string, block: ScrollLogicalPosition = "start") {
   const until = Date.now() + 3000;
@@ -69,6 +76,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   const [tier, setTier] = useState<"core" | "all">("core");
   // A replayed dislocation, requested from the page. Null = live prices.
   const [demo, setDemo] = useState<Scenario | null>(null);
+  // A real past moment being replayed: the same board maths over recorded
+  // trades. Unlike the modelled scenario, every number was once true.
+  const [replay, setReplay] = useState<ReplayInfo | null>(null);
+  const [replayFailed, setReplayFailed] = useState(false);
   // Pair shown in the on-page gap history; defaults to the headline pair.
   const [chartTicker, setChartTicker] = useState<string | null>(null);
   const [chartDays, setChartDays] = useState<2 | 7>(2);
@@ -198,10 +209,43 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   );
 
   useEffect(() => {
+    // A replay is a fixed moment: polling would overwrite it with now.
+    if (replay) return;
     void refresh(tier);
     const id = setInterval(() => void refresh(tier), POLL_MS);
     return () => clearInterval(id);
-  }, [tier, refresh]);
+  }, [tier, refresh, replay]);
+
+  /**
+   * Replay the widest real dislocation of the week — or a given moment. Falls
+   * back to the modelled scenario only if no real history can be read, and
+   * says which one is on screen either way.
+   */
+  const startReplay = useCallback(async (at?: number) => {
+    setReplayFailed(false);
+    try {
+      const res = await fetch(`/api/replay${at ? `?at=${at}` : ""}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const snapshot = (await res.json()) as BoardSnapshot & { replay: ReplayInfo };
+      setSelected(null);
+      setDemo(null);
+      setBoard(snapshot);
+      setReplay(snapshot.replay);
+    } catch {
+      // No real history to replay: the modelled scenario still shows the shape.
+      setReplayFailed(true);
+      setSelected(null);
+      setDemo("live_dislocation");
+    }
+  }, []);
+
+  const backToLive = useCallback(() => {
+    setSelected(null);
+    setDemo(null);
+    setReplay(null);
+    setReplayFailed(false);
+    void refresh(tier);
+  }, [refresh, tier]);
 
   useEffect(() => {
     if (!selected) {
@@ -236,7 +280,13 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   // so a shared link opens exactly the view it was copied from.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("replay") === "1") setDemo("live_dislocation");
+    const wantsReplay = params.get("replay");
+    if (wantsReplay === "1" || wantsReplay === "real") {
+      const at = Number(params.get("at"));
+      void startReplay(Number.isFinite(at) && at > 0 ? at : undefined);
+    } else if (wantsReplay === "modelled") {
+      setDemo("live_dislocation");
+    }
     if (params.get("view") === "example") {
       watch(EXAMPLE_WALLET.address);
       // Older links opened the example on the one-page board; it lives on Portfolio now.
@@ -261,14 +311,19 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       params.set("trade", selected);
       if (tradeSide) params.set("side", tradeSide);
     }
-    if (demo) params.set("replay", "1");
+    if (replay) {
+      params.set("replay", "real");
+      params.set("at", String(replay.at));
+    } else if (demo) {
+      params.set("replay", "modelled");
+    }
     if (view === "portfolio" && watching && owner === EXAMPLE_WALLET.address) params.set("view", "example");
     const query = params.toString();
     const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     if (next !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, "", next);
     }
-  }, [selected, tradeSide, demo, watching, owner, view]);
+  }, [selected, tradeSide, demo, replay, watching, owner, view]);
   const held = useMemo(() => {
     const out = new Set<string>();
     if (!mints) return out;
@@ -305,6 +360,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return () => clearInterval(id);
   }, [stale]);
 
+  // Historical or modelled: either way nothing on screen is a price you can trade at.
+  const frozen = demo !== null || replay !== null;
   const hedgeable = board.session.isRegularHours;
   const tradeable = board.readings.filter(
     (r) => r.signal === "actionable" || r.signal === "stale_reference",
@@ -362,9 +419,15 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       { id: "go-how", group: "Go to", label: "How Kolu reads a gap", keywords: "noise floor hedge breakeven explain", run: () => go("/", "how-it-reads") },
     ];
     const actions: Command[] = [
-      demo
-        ? { id: "live", group: "Actions", label: "Back to live prices", keywords: "replay stop demo", run: () => { setSelected(null); setDemo(null); } }
-        : { id: "replay", group: "Actions", label: "Replay a dislocation", keywords: "demo scenario gap opens", run: () => { setSelected(null); setDemo("live_dislocation"); } },
+      frozen
+        ? { id: "live", group: "Actions", label: "Back to live prices", keywords: "replay stop demo", run: backToLive }
+        : {
+            id: "replay",
+            group: "Actions",
+            label: "Replay the week's widest real gap",
+            keywords: "demo scenario dislocation history",
+            run: () => void startReplay(),
+          },
       {
         id: "example",
         group: "Actions",
@@ -399,7 +462,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
     return [...pairs, ...goto, ...actions];
     // showHistory is recreated each render but only closes over setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board.readings, demo, tier, breakeven, armBreakeven, openTrade, watch, view]);
+  }, [board.readings, demo, frozen, replay, tier, breakeven, armBreakeven, openTrade, watch, view, backToLive, startReplay]);
 
   return (
     <div>
@@ -408,7 +471,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         <div className="flex items-center gap-2">
           <PaletteButton />
           <CommandPalette commands={commands} />
-          {board.degraded === "no_feeds" ? (
+          {replay ? (
+            <Badge tone="accent">Replay · {replay.label} ET</Badge>
+          ) : board.degraded === "no_feeds" ? (
             <Badge tone="up">Misconfigured</Badge>
           ) : board.source === "fixture" ? (
             // Configured demo mode is not a fallback, so `fellBack` is false
@@ -438,6 +503,33 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         </p>
       )}
 
+      {replay && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-[13px] leading-relaxed">
+          <p className="text-[var(--text-2)]">
+            <span className="mono mr-2 rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-[10.5px] uppercase tracking-[0.06em] text-white">
+              Replay · real trades
+            </span>
+            The board as Kolu computed it on{" "}
+            <span className="text-white">{replay.label} ET</span> — from the tokens&rsquo; own pool prints against the
+            real shares&rsquo; last exchange prints. Every number was true then; trading is off because none of them is
+            a price you can hit now.
+          </p>
+          <button
+            type="button"
+            onClick={backToLive}
+            className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--accent)]/40 px-3 py-1 text-[12px] font-medium text-[var(--accent-hover)] transition-colors hover:bg-[var(--accent)]/10"
+          >
+            Back to live prices
+          </button>
+        </div>
+      )}
+
+      {replayFailed && !replay && (
+        <p className="mb-5 rounded-[var(--radius)] border border-[var(--warn)]/25 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] text-[var(--text-2)]">
+          Real history could not be read just now, so this is the modelled scenario instead — labelled below.
+        </p>
+      )}
+
       {board.source === "fixture" && board.degraded !== "no_feeds" && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--warn)]/20 bg-[var(--warn-soft)] px-4 py-2.5 text-[12px] leading-relaxed text-[var(--text-2)]">
           <p>
@@ -451,10 +543,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           {demo && (
             <button
               type="button"
-              onClick={() => {
-                setSelected(null);
-                setDemo(null);
-              }}
+              onClick={backToLive}
               className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--warn)]/40 px-3 py-1 text-[12px] font-medium text-[var(--warn)] transition-colors hover:bg-[var(--warn)]/10"
             >
               Back to live prices
@@ -494,10 +583,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       {view === "board" && (
         <>
       <FirstVisit
-        onReplay={() => {
-          setSelected(null);
-          setDemo("live_dislocation");
-        }}
+        onReplay={() => void startReplay()}
         onExample={() => {
           setDemo(null);
           watch(EXAMPLE_WALLET.address);
@@ -521,12 +607,13 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         armedAtBreakeven={armedAtBreakeven}
         pairs={board.readings.length}
         signals={tradeable.length}
+        asOf={replay?.label ?? null}
         closest={board.readings.reduce<(typeof board.readings)[number] | null>(
           (best, r) => (r.basisBps !== null && (!best || Math.abs(r.basisBps) > Math.abs(best.basisBps ?? 0)) ? r : best),
           null,
         )}
         onArmBreakeven={demo ? undefined : armBreakeven}
-        onReplay={demo ? undefined : () => { setSelected(null); setDemo("live_dislocation"); }}
+        onReplay={frozen ? undefined : () => void startReplay()}
       />
       </ErrorBoundary>
 
@@ -608,7 +695,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         mints={mints}
         onTrade={openTrade}
         onShowAll={tier === "all" ? undefined : () => setTier("all")}
-        demo={demo !== null}
+        demo={frozen}
       />
       </ErrorBoundary>
 
@@ -687,7 +774,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           hedgeable={hedgeable}
           mints={mints}
           initialSide={tradeSide}
-          demo={demo !== null}
+          demo={frozen}
           rules={rules}
           permission={permission}
           onAddRule={addRule}

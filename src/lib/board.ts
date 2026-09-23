@@ -34,7 +34,8 @@ export type DegradedKind = "unreachable" | "no_feeds";
 export interface BoardSnapshot {
   generatedAt: string;
   session: MarketSession;
-  source: "pyth" | "jupiter" | "fixture";
+  /** "replay" is the live board's maths run over real trades from a past moment. */
+  source: "pyth" | "jupiter" | "fixture" | "replay";
   /** True when the live source failed and fixtures were substituted. */
   fellBack: boolean;
   fallbackReason: string | null;
@@ -158,7 +159,8 @@ async function buildBoardUncached(options: BoardOptions): Promise<BoardSnapshot>
   };
 }
 
-function summarise(readings: BasisReading[]): BoardSummary {
+/** Shared with the replay route, which builds a board from recorded trades. */
+export function summarise(readings: BasisReading[]): BoardSummary {
   const tradeable = readings.filter(
     (r) => r.signal === "actionable" || r.signal === "stale_reference",
   );

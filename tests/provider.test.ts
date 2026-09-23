@@ -166,9 +166,12 @@ describe("the Pyth path, end to end", () => {
       // 120bps a leg → 240bps combined; 5bps a leg → 10bps. Neither is the 6bps assumption.
       expect(Math.round(tsla!.confidenceBps!)).toBe(240);
       expect(Math.round(nvda!.confidenceBps!)).toBe(10);
-      // And the classification follows the feed, not the gap.
+      // And the classification follows the feed, not the gap. Which flavour of
+      // signal the narrow pair gets depends on whether the US market happens to
+      // be open while the test runs; what must hold is that it escapes the floor
+      // and the wide one does not.
       expect(tsla!.signal).toBe("noise");
-      expect(nvda!.signal).toBe("actionable");
+      expect(["actionable", "stale_reference"]).toContain(nvda!.signal);
     } finally {
       server.close();
     }

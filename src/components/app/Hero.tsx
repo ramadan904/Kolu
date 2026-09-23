@@ -28,6 +28,7 @@ export function Hero({
   pairs = 0,
   signals = 0,
   closest = null,
+  asOf = null,
   onArmBreakeven,
   onReplay,
 }: {
@@ -45,6 +46,8 @@ export function Hero({
   signals?: number;
   /** On a quiet board, the pair nearest to a real gap: the card shows its evidence instead. */
   closest?: BasisReading | null;
+  /** Set while replaying a past moment: the headline must not claim to be live. */
+  asOf?: string | null;
   onArmBreakeven?: () => void;
   /** Replays a modelled dislocation, for a board with nothing to show. */
   onReplay?: () => void;
@@ -104,7 +107,7 @@ export function Hero({
           )}
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">{armAction}</div>
-        {replayButton("Quiet right now — see what Kolu does when a gap opens")}
+        {replayButton("Quiet right now — replay the widest real gap of the week")}
         </div>
         {closest && closest.basisBps !== null && (
           <SignalCard
@@ -127,8 +130,9 @@ export function Hero({
       hedgeable={hedgeable}
       session={session}
       onTrade={onTrade}
+      asOf={asOf}
       armAction={armAction}
-      replay={replayButton("Nothing pays yet — see what Kolu does when a gap does")}
+      replay={replayButton("Nothing pays yet — replay the widest real gap of the week")}
       breakevenBps={breakevenBps}
       pairs={pairs}
       signals={signals}
@@ -141,6 +145,7 @@ function Dislocation({
   hedgeable,
   session,
   onTrade,
+  asOf,
   armAction,
   replay,
   breakevenBps,
@@ -151,6 +156,7 @@ function Dislocation({
   hedgeable: boolean;
   session: MarketSession;
   onTrade: (ticker: string) => void;
+  asOf: string | null;
   armAction: React.ReactNode;
   replay: React.ReactNode;
   breakevenBps?: number;
@@ -168,7 +174,7 @@ function Dislocation({
     <section className="relative grid gap-10 py-12 sm:py-14 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:gap-12">
       <div className="rise min-w-0">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="eyebrow">Widest dislocation · live</span>
+          <span className="eyebrow">Widest dislocation · {asOf ? `${asOf} ET` : "live"}</span>
           <Badge tone={discount ? "down" : "up"}>{discount ? "▼ Trading cheap" : "▲ Trading rich"}</Badge>
         </div>
 

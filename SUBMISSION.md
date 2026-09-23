@@ -114,8 +114,12 @@ The grey band on the map is the oracles' own confidence; inside it is noise,
 and Kolu says *Hold* rather than invent a trade." If a real gap is open, it
 leads the page; if nothing pays, the hero says so and offers the replay.
 
-**0:35 — What acting looks like.** Click *See what Kolu does when a gap opens*.
-Amber banner: modelled, trading off, your position hidden. Open the ticket:
+**0:35 — A real dislocation, replayed.** Click *Replay a real dislocation*. The
+board rebuilds itself as it stood at the widest real gap of the week — AAPLX
++148bps against the real Apple share, Saturday 06:30 ET, from the token's own
+pool prints against the share's last exchange print. Same maths, same noise
+floor, only the clock is different; the banner says so and trading is off.
+Open the ticket:
 "*Sell NVDAX · +130bps survives at $2k.* Net edge at four sizes from live
 Jupiter quotes — here's where it stops paying. The market is shut, so it's
 directional, not an arbitrage, and never shown in green." *Back to live prices.*
@@ -223,7 +227,7 @@ so a leftover placeholder is dropped rather than handed to a router.
 ## Links
 
 - **Live:** https://kolu-ramrex904-5914.vercel.app
-- **Straight to it:** [replay a dislocation](https://kolu-ramrex904-5914.vercel.app/?replay=1) ·
+- **Straight to it:** [replay the week's widest real gap](https://kolu-ramrex904-5914.vercel.app/?replay=1) ·
   [a live portfolio](https://kolu-ramrex904-5914.vercel.app/portfolio?view=example) · [gap history](https://kolu-ramrex904-5914.vercel.app/history) · [the backtest](https://kolu-ramrex904-5914.vercel.app/backtest) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
 - **Health:** https://kolu-ramrex904-5914.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu
