@@ -19,6 +19,18 @@ function Mark() {
   );
 }
 
+/**
+ * The swap that proves the trade path: made through this ticket, signed in a
+ * wallet, confirmed on mainnet. Figures are the transaction's own balance
+ * changes, not the quote that preceded it.
+ */
+const REAL_FILL = {
+  paid: "4.007 USDC",
+  received: "0.010582 TSLAX",
+  date: "22 Sep 2026",
+  url: "https://solscan.io/tx/5YyfS2csucHcc7e4U1XsrvA3gk8whBLHt5CcEHL1M7ZyBHU1a86NM8K2qxoJWZGzGxn9ZC9XMmLeJ1rNSbMe9MhY",
+};
+
 export function Shell({
   children,
   nav,
@@ -86,7 +98,24 @@ export function Shell({
           />
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-          <p className="border-t border-[var(--border)] pt-5 text-[11px] leading-relaxed text-[var(--text-3)]">
+          {/* The proof that the trade path is not a diagram: a swap made here,
+              on mainnet, that anyone can open and check. */}
+          <a
+            href={REAL_FILL.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="group flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-[var(--border)] pt-5 text-[12px] text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
+          >
+            <span className="mono rounded-full border border-[var(--down)]/30 bg-[var(--down-soft)] px-2 py-0.5 text-[10.5px] tracking-[0.06em] text-[var(--down)]">
+              REAL FILL
+            </span>
+            <span className="num text-[var(--text-2)]">{REAL_FILL.paid}</span>
+            <span aria-hidden="true">→</span>
+            <span className="num text-[var(--text-2)]">{REAL_FILL.received}</span>
+            <span>· swapped through Kolu on {REAL_FILL.date}, signed in a wallet, confirmed on mainnet</span>
+            <span className="text-[var(--accent)] underline-offset-2 group-hover:underline">view on Solscan ↗</span>
+          </a>
+          <p className="mt-4 text-[11px] leading-relaxed text-[var(--text-3)]">
             Prices are mid, not a quote you can hit; the ticket prices trades from live
             Jupiter quotes. Kolu never holds keys — every trade and order is signed in your wallet.
             Kolu is analysis, not investment advice.
