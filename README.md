@@ -11,6 +11,17 @@ Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
 
 **[Open the live board](https://kolu-app.vercel.app)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
 
+**Proven on mainnet.** A real swap made through this site, signed in a wallet,
+confirmed on-chain: [`5YyfS2cs…Me9MhY`](https://solscan.io/tx/5YyfS2csucHcc7e4U1XsrvA3gk8whBLHt5CcEHL1M7ZyBHU1a86NM8K2qxoJWZGzGxn9ZC9XMmLeJ1rNSbMe9MhY)
+— **0.033977 SOL → 0.01058247 TSLAX**, 22 Sep 2026, slot 449507721. Quote →
+wallet signature → polled confirmation → *Filled*, with the entry price read back
+from what the transaction actually moved (network fee and refundable account rent
+excluded). The same line sits in the footer of every page on the live site.
+
+**Check it in one request:** [`/api/health`](https://kolu-app.vercel.app/api/health)
+says which price source is serving and whether the noise band is Pyth's published
+confidence or Kolu's own labelled ±6bps assumption (`noiseFloor.basis`).
+
 **Four pages, one live board.** *Board* is the market now (the headline gap,
 the map, every pair, alerts). *Portfolio* is your holdings, P&L, orders and
 activity. *History* is a week of real gaps and whether they closed at the open.
