@@ -142,6 +142,13 @@ export function Hero({
       session={session}
       onTrade={onTrade}
       asOf={asOf}
+      replayAction={
+        onReplay ? (
+          <Button size="lg" variant="secondary" onClick={onReplay}>
+            Replay a real dislocation
+          </Button>
+        ) : null
+      }
       armAction={armAction}
       replay={replayButton("Nothing pays yet — replay the widest real gap of the week")}
       breakevenBps={breakevenBps}
@@ -157,6 +164,7 @@ function Dislocation({
   session,
   onTrade,
   asOf,
+  replayAction,
   armAction,
   replay,
   breakevenBps,
@@ -168,6 +176,7 @@ function Dislocation({
   session: MarketSession;
   onTrade: (ticker: string) => void;
   asOf: string | null;
+  replayAction: React.ReactNode;
   armAction: React.ReactNode;
   replay: React.ReactNode;
   breakevenBps?: number;
@@ -219,14 +228,15 @@ function Dislocation({
             Trade {reading.tokenTicker}
             <span aria-hidden="true">→</span>
           </Button>
-          {!pays && armAction}
+          {!pays && replayAction}
         </div>
+        {!pays && <div className="mt-3 flex flex-wrap items-center gap-3">{armAction}</div>}
         {!pays && breakevenBps && (
           <p className="mono mt-3 text-[11px] text-[var(--text-3)]">
             Alerts arm every pair at {breakevenBps}bps — where a $10k trade starts to clear fees and impact.
           </p>
         )}
-        {!pays && replay}
+
       </div>
 
       <SignalCard
