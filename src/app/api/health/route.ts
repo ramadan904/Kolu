@@ -131,6 +131,11 @@ export async function GET() {
         // The whole chain the relay will try, in order. Hosts only: a
         // dedicated provider's URL carries its key.
         walletRpcChain: rpcUpstreams().map(upstreamHost),
+        // Diagnostics for "I set it and nothing changed": which RPC-ish names
+        // this runtime can actually see. Names only — a value carries the key.
+        rpcEnvSeen: Object.keys(process.env)
+          .filter((k) => /RPC|SOLANA|HELIUS|QUICKNODE|ALCHEMY/i.test(k))
+          .sort(),
       },
       build: {
         commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
