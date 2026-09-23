@@ -255,7 +255,9 @@ export function MarketMap({
       <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-3)]">
         Left of centre trades below the real share; right of centre trades above it.
         The shaded middle is {bandCopy(source).short} — anything inside it is noise, not a
-        dislocation.
+        dislocation. Every pair here is a Backed xStock, the deepest tokenized-equity pools on
+        Solana: one issuer, so a gap is the market disagreeing with itself rather than two
+        issuers priced differently.
         {held && held.size > 0 && (
           <>
             {" "}
