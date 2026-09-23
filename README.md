@@ -74,8 +74,19 @@ artifact of a 24/7 settlement layer wrapping a 09:30–16:00 asset, and it only
 appears where those two clocks touch.
 
 Pyth publishes both sides of that seam — `Equity.US.AAPL/USD` for the real
-share, `Crypto.AAPLX/USD` for the token. Kolu is what you get when you put them
-next to each other and take the difference seriously.
+share, `Crypto.AAPLX/USD` for the token — and, with every print, the
+**confidence interval** around it. That second number is the product. A price
+difference is not a dislocation: two prices, each carrying its own uncertainty,
+can differ by 60bps and be the same price. Every refusal in Kolu — the greyed
+rows, the alerts that will not fire, the shaded band on the map — is that one
+idea applied consistently.
+
+The deployed board serves Jupiter prices (no key required) and says so; the
+Pyth adapter ships and `PYTH_API_KEY` switches to the published bands, with
+`/api/health` → `noiseFloor.basis` naming which is in force. Where the band is
+Kolu's own ±6bps assumption, the board says exactly that rather than implying an
+oracle's. See [SUBMISSION.md](SUBMISSION.md#pyth-track) for the proof that the
+published band changes the classification.
 
 ## What it does
 

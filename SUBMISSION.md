@@ -76,27 +76,59 @@ Take any of those three away and the product is impossible.
 
 ## Pyth track
 
-Kolu's core operation is a comparison Pyth is built for: the same asset, priced
-two ways, on one clock. The integration ships and is verified in CI; the
-deployed board serves Jupiter prices because Pyth began charging for price
-updates in August 2026 (plans from $500/month) and this submission has no key.
-Set `PYTH_API_KEY` and the same board runs on Pyth with no other change —
-`/api/health` will show `serving: pyth` and `noiseFloor.basis: published
-confidence`.
+**Kolu is an argument about confidence intervals.** Every other tokenized-stock
+screen shows you a price difference. A price difference is not a dislocation:
+two prices, each carrying its own uncertainty, can differ by 60bps and be the
+same price. Pyth is the only source that publishes that uncertainty with every
+print, which is why the entire product is built around it — the noise floor,
+the greyed-out rows, the alerts that refuse to fire, the map's shaded band and
+the "Is the gap real?" card are all one idea: **a gap smaller than 1.5× the two
+legs' combined confidence is two error bars overlapping, and Kolu will not call
+it a trade.**
+
+Publish time is the second Pyth idea the product leans on. A reference that is
+old because the market is shut and a reference that is old because the feed
+stalled look identical in a price column and demand opposite responses — one is
+the whole opportunity, the other is a reason to refuse to act. Kolu reports them
+as different conditions (*Overnight drift* vs *Feed stalled*), and alerts never
+fire on the second.
+
+**What runs where.** The adapter ships and is exercised in CI. The deployed
+board serves Jupiter prices because Pyth began charging for price *updates* in
+August 2026 (plans from $500/month) and this submission has no key: Hermes
+`/v2/price_feeds` still answers anonymously, so symbol resolution and feed-id
+verification run against live Pyth on every change, while
+`/v2/updates/price/latest` returns 401. There are no sponsored on-chain price
+accounts for these equity feeds either — the receiver PDAs do not exist — so
+there is no keyless path to live Pyth prices, and inventing one would mean
+passing an assumption off as an oracle's.
+
+So Kolu does the honest thing in both directions: **with a key it uses the
+published bands; without one it says, in those words, that the ±6bps band is its
+own assumption** — on the board ("band · assumed ±6bps a leg"), in the
+explainer, and in `/api/health` (`noiseFloor.basis`). One environment variable
+switches it:
+
+| | No key (deployed) | `PYTH_API_KEY` set |
+| --- | --- | --- |
+| `source.serving` | `jupiter` | `pyth` |
+| `noiseFloor.basis` | `assumed` | `published confidence` |
+| Board chip | band · assumed ±6bps a leg | band · Pyth confidence |
+
+**And the published band is proven to matter, without a key.** An integration
+test stands up Hermes' own response shapes and gives two pairs the *same* 40bps
+gap with different published confidence — ±120bps a leg and ±5bps a leg. The
+wide one classifies as **noise**, the narrow one as **actionable**. No
+assumption could produce that split; only the feed's own uncertainty can.
+Run it: `npx vitest run tests/provider.test.ts`.
 
 - Uses **both** the US equity feeds and the tokenized-equity crypto feeds.
-- Uses the **confidence interval**, not just the price — it is what separates a
-  signal from two overlapping error bars, and it is drawn on the chart. Without
-  a key the band is a labelled assumption, never passed off as an oracle's.
-- Uses **publish time** to distinguish a reference that is stale because the
-  market is shut from one that is stale because the feed has stalled. These are
-  reported as different conditions because a trader responds to each
-  differently.
-- Feed ids are **resolved from Hermes by symbol at runtime**, never hardcoded.
-  A wrong feed id is a silently wrong price, and a price wrong by a factor of
-  100 looks like the trade of the year. Resolution is verified against the live
-  endpoint in CI — 24/24 symbols, all 12 tickers with both legs — on every
-  change to the universe and on a weekday schedule.
+- Uses the **confidence interval**, not just the price.
+- Uses **publish time** to separate *shut* from *stalled*.
+- Feed ids are **resolved from Hermes by symbol at runtime**, never hardcoded —
+  a wrong feed id is a silently wrong price, and one wrong by a factor of 100
+  looks like the trade of the year. Verified against live Hermes in CI: 24/24
+  symbols, all 12 tickers, both legs, on every change to the universe.
 
 ---
 
