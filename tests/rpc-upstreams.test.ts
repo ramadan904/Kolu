@@ -24,3 +24,15 @@ describe("rpcUpstreams", () => {
     expect(rpcHost("not a url")).toBe("invalid-url");
   });
 });
+
+describe("a mis-pasted SOLANA_RPC_URL", () => {
+  it("is skipped, so the relay never wastes an attempt on it", () => {
+    for (const bad of ["my-api-key-1234", '"https://x.example"', "wss://mainnet.example/ws", "dashboard.helius.dev", ""]) {
+      expect(rpcUpstreams(bad)).toEqual([...PUBLIC_FALLBACKS]);
+    }
+  });
+
+  it("still leads with a valid endpoint", () => {
+    expect(rpcUpstreams("https://mainnet.helius-rpc.com/?api-key=abc")[0]).toBe("https://mainnet.helius-rpc.com/?api-key=abc");
+  });
+});

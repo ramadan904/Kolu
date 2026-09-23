@@ -15,8 +15,21 @@ export const PUBLIC_FALLBACKS = [
   "https://api.mainnet-beta.solana.com",
 ] as const;
 
+/** Only an http(s) URL can be called; anything else is a mis-paste, not an endpoint. */
+function usable(url: string | undefined): url is string {
+  if (!url) return false;
+  try {
+    return /^https?:$/.test(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export function rpcUpstreams(configured = process.env.SOLANA_RPC_URL): string[] {
-  const first = configured?.trim();
+  // A value that is not a URL — a bare API key, a dashboard link, a stray
+  // quote — is skipped rather than tried and failed. Half-finished setup
+  // should cost nothing; /api/health still reports what it saw.
+  const first = usable(configured?.trim()) ? configured!.trim() : undefined;
   const list = first ? [first, ...PUBLIC_FALLBACKS] : [...PUBLIC_FALLBACKS];
   // A configured endpoint that is already one of the public ones must not be tried twice.
   return [...new Set(list.map((u) => u.replace(/\/$/, "")))];
