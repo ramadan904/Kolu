@@ -206,7 +206,8 @@ Pyth Hermes adapter with runtime feed resolution, basis computation with the
 oracle noise floor, stale-vs-degraded classification, 48h history with
 closed-market shading, cost and edge model, threshold alerts, the full board and
 action surface. A wallet trade flow — live Jupiter quote, wallet signature,
-polled confirmation that never reports a reverted swap as filled — and a
+polled confirmation that never reports a reverted swap as filled — closed end
+to end with real money on the deployed site, entry price and all — and a
 positions view that values any Solana address's real xStock holdings against
 the live gaps. 236 tests. Falls back to labelled demo data when the live source
 is unreachable.
@@ -259,9 +260,11 @@ then the real swap transaction built and deserialized as a
 `VersionedTransaction`. 24/24 legs, in CI, on every change to the routing code
 (`.github/workflows/verify-routes.yml`).
 
-That covers route, assembly, encoding and deserialization. What is **not**
-tested is the signature itself — by design, nothing but the user's own wallet
-can produce one. Kolu holds no key material and never signs.
+That covers route, assembly, encoding and deserialization in CI. The signature
+CI cannot produce — only a user's wallet can — was supplied by hand: the $4
+TSLAX buy above signed, landed and confirmed on the deployed site, and the
+position appeared with its entry price recorded from the transaction itself.
+Kolu holds no key material and never signs.
 
 **Deliberately absent:** token mint addresses. A wrong mint does not throw, it
 routes an order into a different asset that happens to share a ticker. The repo
