@@ -42,12 +42,15 @@ function GapBar({ bps, domain, muted = false }: { bps: number; domain: number; m
 export function AssetList({
   readings,
   hedgeable,
+  frozen = false,
   selected,
   onSelect,
   held,
 }: {
   readings: BasisReading[];
   hedgeable: boolean;
+  /** A replayed or modelled board: nothing on it is happening now. */
+  frozen?: boolean;
   selected: string | null;
   onSelect: (ticker: string) => void;
   held?: ReadonlySet<string>;
@@ -118,7 +121,9 @@ export function AssetList({
                     </svg>
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
-                    <span>{SIGNAL_LABEL[r.signal]}</span>
+                    {/* "Live gap" is the right words for a live board and the
+                        wrong ones for a replayed moment. */}
+                    <span>{frozen && r.signal === "actionable" ? "Real gap" : SIGNAL_LABEL[r.signal]}</span>
                     {r.referenceAgeSeconds !== null && r.referenceAgeSeconds > 120 && (
                       <span>· {formatAge(r.referenceAgeSeconds)} old</span>
                     )}

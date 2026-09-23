@@ -81,6 +81,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   // A real past moment being replayed: the same board maths over recorded
   // trades. Unlike the modelled scenario, every number was once true.
   const [replay, setReplay] = useState<ReplayInfo | null>(null);
+  // Read inside async callbacks: a live response already in flight when a
+  // replay starts must not land on the replayed board. State would be stale
+  // in those closures, which is how live prices ended up under a REPLAY badge.
+  const replayRef = useRef(false);
   const [replayFailed, setReplayFailed] = useState(false);
   // Pair shown in the on-page gap history; defaults to the headline pair.
   const [chartTicker, setChartTicker] = useState<string | null>(null);
@@ -189,7 +193,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
         );
         if (!res.ok) throw new Error(String(res.status));
         const snapshot: BoardSnapshot = await res.json();
-        if (seq !== requestSeq.current) return;
+        if (seq !== requestSeq.current || replayRef.current) return;
         setBoard(snapshot);
         setStale(false);
         setFreshAt(Date.now());
@@ -225,6 +229,10 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
    */
   const startReplay = useCallback(async (at?: number) => {
     setReplayFailed(false);
+    // Claim the board before the fetch: any live request already out there is
+    // now stale, and the poll is stopped for as long as the replay is on.
+    replayRef.current = true;
+    requestSeq.current += 1;
     try {
       const res = await fetch(`/api/replay${at ? `?at=${at}` : ""}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
@@ -234,7 +242,9 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       setBoard(snapshot);
       setReplay(snapshot.replay);
     } catch {
-      // No real history to replay: the modelled scenario still shows the shape.
+      // No real history to replay: the modelled scenario still shows the shape,
+      // and it polls like any other scenario, so the board is live again.
+      replayRef.current = false;
       setReplayFailed(true);
       setSelected(null);
       setDemo("live_dislocation");
@@ -242,6 +252,8 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
   }, []);
 
   const backToLive = useCallback(() => {
+    // Release the board first, or the refresh below is discarded as stale.
+    replayRef.current = false;
     setSelected(null);
     setDemo(null);
     setReplay(null);
@@ -670,6 +682,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
       <AssetList
         readings={board.readings}
         hedgeable={hedgeable}
+        frozen={frozen}
         selected={selected}
         held={held}
         onSelect={(t) => {
