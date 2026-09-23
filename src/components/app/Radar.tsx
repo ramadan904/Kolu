@@ -775,6 +775,7 @@ export function Radar({ initial }: { initial: BoardSnapshot }) {
           mints={mints}
           initialSide={tradeSide}
           demo={frozen}
+          replayKind={replay ? "real" : "modelled"}
           rules={rules}
           permission={permission}
           onAddRule={addRule}

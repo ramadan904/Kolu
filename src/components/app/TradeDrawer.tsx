@@ -27,6 +27,7 @@ export function TradeDrawer({
   mints,
   initialSide,
   demo = false,
+  replayKind = "modelled",
   rules,
   permission,
   onAddRule,
@@ -41,6 +42,8 @@ export function TradeDrawer({
   mints: MintMap | null;
   initialSide?: Side;
   demo?: boolean;
+  /** Passed through: a real replayed moment reads differently from a modelled one. */
+  replayKind?: "real" | "modelled";
   rules: AlertRule[];
   permission: NotificationPermission | "unsupported";
   onAddRule: (ticker: string, thresholdBps: number, direction: AlertDirection) => void;
@@ -189,6 +192,7 @@ export function TradeDrawer({
             mints={mints}
             initialSide={initialSide}
             demo={demo}
+            replayKind={replayKind}
             typical={
               context && context.typicalOpenBps !== null && context.typicalShutBps !== null
                 ? { openBps: context.typicalOpenBps, shutBps: context.typicalShutBps }

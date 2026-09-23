@@ -25,6 +25,8 @@ import { WalletButton } from "./WalletButton";
 import { LimitOrder } from "./LimitOrder";
 import { useDislocations } from "./useDislocations";
 import { recordFill } from "./useJournal";
+import { convergenceOutlook, untilOpen } from "@/lib/basis/convergence";
+import { minutesToNextOpen } from "@/lib/market/session";
 import { NARROWED_PCT } from "@/lib/data/market-history";
 
 export type Side = "buy" | "sell";
@@ -128,6 +130,7 @@ export function TradePanel({
   mints,
   initialSide,
   demo = false,
+  replayKind = "modelled",
   typical,
   children,
 }: {
@@ -138,6 +141,8 @@ export function TradePanel({
   initialSide?: Side;
   /** A replayed, modelled scenario: the ticket explains, but nothing can be sent or simulated. */
   demo?: boolean;
+  /** Which kind of frozen board this is: a real past moment, or the modelled shape. */
+  replayKind?: "real" | "modelled";
   /** This pair's median |gap| over 48h of real history, open vs shut. */
   typical?: { openBps: number; shutBps: number };
   /**
@@ -344,6 +349,15 @@ export function TradePanel({
     [edgeAt, notional, impactBps, sizeValid],
   );
   const risk = edge ? worstCase(edge.netBps, slippageBps) : null;
+  // What this pair's own opens say about the gap on screen. Only meaningful
+  // while the share cannot trade — that is the bet the clock is about.
+  const outlook = useMemo(
+    () =>
+      !hedgeable && gapIsSignal && opens.length > 0 && reading.basisBps !== null
+        ? convergenceOutlook(opens, reading.basisBps, edge?.costBps ?? DEFAULT_COSTS.priceImpactBps * 2)
+        : null,
+    [hedgeable, gapIsSignal, opens, reading.basisBps, edge?.costBps],
+  );
 
   const received = quote?.available ? fromBaseUnits(quote.outAmount, quote.outDecimals) : null;
   const minReceived = quote?.available
@@ -637,21 +651,25 @@ export function TradePanel({
   return (
     <div>
       <div className="space-y-6">
+        {outlook && <ConvergenceClock outlook={outlook} reading={reading} sizeUsd={notional} />}
+
         <Verdict
           {...verdict}
           body={
             demo
-              ? `${verdict.body} Replay: the gap is modelled, the costs are live.`.trim()
+              ? `${verdict.body} ${
+                  replayKind === "real"
+                    ? "Replay: this gap really happened; the costs and quotes are live."
+                    : "Replay: the gap is modelled, the costs are live."
+                }`.trim()
               : [
                   verdict.body,
                   [
                     typical
                       ? `Typical for ${reading.tokenTicker} over 48h: ~${Math.round(typical.openBps)}bps while the share trades, ~${Math.round(typical.shutBps)}bps while it is shut`
                       : "",
-                    // A closed-market trade is a bet on the open; say how that bet has gone.
-                    !hedgeable && gapIsSignal && opens.length > 0
-                      ? `${typical ? "l" : `${reading.tokenTicker}: l`}ast week the gap narrowed at ${opens.filter((e) => e.closedPct >= NARROWED_PCT).length} of ${opens.length} opens`
-                      : "",
+                    // The convergence clock below says how that bet has gone.
+                    "",
                   ]
                     .filter(Boolean)
                     .join("; ")
@@ -1136,9 +1154,11 @@ export function TradePanel({
 
             {demo ? (
               <p className="rounded-[var(--radius-sm)] border border-[var(--warn)]/25 bg-[var(--warn-soft)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
-                <span className="font-medium text-[var(--warn)]">Replay · trading is off.</span> The gap
-                here is modelled; quotes and costs are live. Go back to live prices to trade or
-                dry-run.
+                <span className="font-medium text-[var(--warn)]">Replay · trading is off.</span>{" "}
+                {replayKind === "real"
+                  ? "These are real trades from a past moment; quotes and costs are live."
+                  : "The gap here is modelled; quotes and costs are live."}{" "}
+                Go back to live prices to trade or dry-run.
               </p>
             ) : !connected ? (
               <>
@@ -1433,5 +1453,89 @@ function Confirming({ signature, since }: { signature: string; since: number }) 
         </span>
       )}
     </>
+  );
+}
+
+/**
+ * The bet a closed-market trade is actually making, with a clock on it.
+ *
+ * "It converges by the open" is the claim; this is the pair's own record of
+ * doing that, applied to the gap on screen, after costs. The worst open stays
+ * in view because a median is not a promise, and five opens is a base rate,
+ * not a forecast.
+ */
+function ConvergenceClock({
+  outlook,
+  reading,
+  sizeUsd,
+}: {
+  outlook: NonNullable<ReturnType<typeof convergenceOutlook>>;
+  reading: BasisReading;
+  sizeUsd: number;
+}) {
+  const [minutes, setMinutes] = useState<number | null>(() => minutesToNextOpen());
+  useEffect(() => {
+    const id = setInterval(() => setMinutes(minutesToNextOpen()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const countdown = untilOpen(minutes);
+  const gap = Math.abs(reading.basisBps ?? 0);
+  const pays = (outlook.netBps ?? 0) > 0;
+  // A median that went the other way is the point, not an edge case: say so.
+  const widens = (outlook.medianClosedPct ?? 0) < 0;
+  const usd = outlook.netBps === null ? null : (outlook.netBps / 10_000) * sizeUsd;
+
+  return (
+    <section
+      className="rounded-[var(--radius)] border border-white/[0.08] bg-white/[0.02] px-4 py-3.5"
+      aria-label="Convergence clock"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+          Does it close at the open?
+        </span>
+        <span className="mono text-[11px] text-[var(--text-2)]">
+          {countdown ? <>next open in <span className="text-white">{countdown}</span></> : "at the next open"}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span
+          className="display num text-[30px] leading-none"
+          style={{ color: widens ? "var(--up)" : "var(--down)" }}
+        >
+          {outlook.medianClosedPct === null ? "—" : `${Math.abs(Math.round(outlook.medianClosedPct))}%`}
+        </span>
+        <span className="text-[12px] leading-snug text-[var(--text-2)]">
+          of the gap {widens ? "added" : "closed"} at this pair&rsquo;s median open ·{" "}
+          <span className="num text-white">
+            {outlook.narrowed} of {outlook.total}
+          </span>{" "}
+          narrowed
+        </span>
+      </div>
+
+      <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-3)]">
+        Behave like that median and today&rsquo;s {Math.round(gap)}bps gap{" "}
+        {widens ? "widens by" : "closes by"}{" "}
+        <span className="num text-[var(--text-2)]">{Math.abs(Math.round(outlook.expectedBps ?? 0))}bps</span> —{" "}
+        <span className="num" style={{ color: pays ? "var(--down)" : "var(--up)" }}>
+          {pays ? "+" : "−"}
+          {Math.abs(Math.round(outlook.netBps ?? 0))}bps
+        </span>{" "}
+        after costs
+        {usd !== null && sizeUsd > 0 && (
+          <>
+            , {usd >= 0 ? "+" : "−"}
+            {fmtUsd(Math.abs(usd))} at {fmtUsd(sizeUsd, sizeUsd >= 1000 ? 0 : 2)}
+          </>
+        )}
+        .{" "}
+        {outlook.worstClosedPct !== null && outlook.worstClosedPct < 0 && (
+          <>Its worst open widened the gap by {Math.abs(Math.round(outlook.worstClosedPct))}%. </>
+        )}
+        {outlook.total} opens is a base rate, not a forecast.
+      </p>
+    </section>
   );
 }

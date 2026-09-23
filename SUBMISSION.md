@@ -135,6 +135,12 @@ what each would gain or lose if its gap closed, and its latest xStock activity
 read from chain." Point at the rings on the map. "Connect your own wallet and
 Buy or Sell opens the ticket on that side; a fill lands here without a reload."
 
+**1:45 — The bet, with a clock on it.** The ticket's convergence clock: "next
+open in 7h 10m · 28% of the gap *added* at this pair's median open · 1 of 3
+narrowed". A +148bps gap the verdict says survives costs, and the pair's own
+opens say the bet has gone badly — worst open widened it 199%. Kolu argues with
+its own headline rather than selling it.
+
 **1:55 — Act on a gap while you sleep.** In any ticket, *Limit at a gap*:
 "Buy TSLAX if it trades 0.5% under the real share — that's a real Jupiter limit
 order, filled on-chain with Kolu closed." *Dry run* simulates the exact order.

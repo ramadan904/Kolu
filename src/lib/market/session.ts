@@ -236,3 +236,27 @@ export function timeUntilClose(session: MarketSession): string | null {
   const rest = minutes % 60;
   return rest === 0 ? `${hours} hours` : `${hours}h ${rest}m`;
 }
+
+/**
+ * Minutes until the next 09:30 ET regular open, or null when the next trading
+ * day cannot be known for certain — past the end of the holiday calendar, the
+ * honest answer is "at the next open", not a countdown that might be a day out.
+ */
+export function minutesToNextOpen(at: Date = new Date()): number | null {
+  const { date, minutes, weekday } = toEasternParts(at);
+  const tradingDay = (d: string, day: number) =>
+    day >= 1 && day <= 5 && !(d in MARKET_HOLIDAYS) && isCalendarCovered(d);
+
+  // Today, if the open has not passed yet.
+  if (tradingDay(date, weekday) && minutes < REGULAR_OPEN) return REGULAR_OPEN - minutes;
+
+  // Otherwise the first trading day ahead, up to a long weekend's worth.
+  const start = new Date(`${date}T12:00:00Z`);
+  for (let ahead = 1; ahead <= 5; ahead += 1) {
+    const next = new Date(start.getTime() + ahead * 86_400_000);
+    const iso = next.toISOString().slice(0, 10);
+    if (!tradingDay(iso, next.getUTCDay())) continue;
+    return ahead * 24 * 60 - minutes + REGULAR_OPEN;
+  }
+  return null;
+}
