@@ -25,8 +25,10 @@ function Mark() {
  * changes, not the quote that preceded it.
  */
 const REAL_FILL = {
-  paid: "4.007 USDC",
-  received: "0.010582 TSLAX",
+  // What left the wallet, net of the network fee and the refundable account
+  // rent — not the USDC leg Jupiter routed through on the way.
+  paid: "0.033977 SOL",
+  received: "0.01058247 TSLAX",
   date: "22 Sep 2026",
   url: "https://solscan.io/tx/5YyfS2csucHcc7e4U1XsrvA3gk8whBLHt5CcEHL1M7ZyBHU1a86NM8K2qxoJWZGzGxn9ZC9XMmLeJ1rNSbMe9MhY",
 };
