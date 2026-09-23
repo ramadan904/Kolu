@@ -64,7 +64,7 @@ export function Shell({
               ["Portfolio", "/portfolio"],
               ["Gap history", "/history"],
               ["Backtest", "/backtest"],
-              ["Replay a dislocation", "/?replay=1"],
+              ["Replay a real dislocation", "/?replay=1"],
               ["A live portfolio", "/portfolio?view=example"],
             ]}
           />

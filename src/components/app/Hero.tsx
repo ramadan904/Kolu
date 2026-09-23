@@ -338,6 +338,7 @@ function SignalCard({
     };
   }, [reading.ticker]);
 
+  const quiet = reading.signal === "noise" || reading.signal === "degraded_feed";
   const noise = reading.confidenceBps !== null ? reading.confidenceBps * NOISE_MULTIPLE : null;
   const next = session.nextPhase && session.minutesToNextPhase !== null
     ? `${SESSION_COPY[session.nextPhase].toLowerCase()} in ${fmtMinutes(session.minutesToNextPhase)}`
@@ -355,14 +356,27 @@ function SignalCard({
         </span>
       </div>
       {title && (
-        <div className="mt-3 flex items-baseline gap-3">
-          <span className={`display num text-[40px] leading-none ${(reading.basisBps ?? 0) < 0 ? "text-cheap" : "text-rich"}`}>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {/* Colour means signal. A gap inside the noise floor gets none, however
+              large it looks, or the page contradicts its own headline. */}
+          <span
+            className={`display num text-[40px] leading-none ${
+              quiet ? "text-[var(--text-2)]" : (reading.basisBps ?? 0) < 0 ? "text-cheap" : "text-rich"
+            }`}
+          >
             {fmtPct(reading.basisBps ?? 0)}
           </span>
-          <span className="text-[12px] text-[var(--text-3)]">vs the real {reading.name} share</span>
+          <span className="text-[12px] text-[var(--text-3)]">
+            vs the real {reading.name} share{quiet && " · inside the noise floor"}
+          </span>
         </div>
       )}
-      <MiniChart points={series?.points ?? null} real={series?.source === "market"} discount={(reading.basisBps ?? 0) < 0} />
+      <MiniChart
+        points={series?.points ?? null}
+        real={series?.source === "market"}
+        discount={(reading.basisBps ?? 0) < 0}
+        muted={quiet}
+      />
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
         <Fact label="Net at $10k" value={`${netBps > 0 ? "+" : "−"}${Math.abs(Math.round(netBps))}bps`} color={netBps > 0 ? "var(--down)" : "var(--text-2)"} />
         <Fact label="Noise floor" value={noise !== null ? `±${noise.toFixed(0)}bps` : "—"} />
@@ -396,7 +410,18 @@ function Fact({ label, value, color }: { label: string; value: string; color?: s
 }
 
 /** 48 hours in 140px: hourly median gap as a lit area, closed-market hours shaded, now as a glowing point. */
-function MiniChart({ points, real, discount }: { points: HistoryPoint[] | null; real: boolean; discount: boolean }) {
+function MiniChart({
+  points,
+  real,
+  discount,
+  muted = false,
+}: {
+  points: HistoryPoint[] | null;
+  real: boolean;
+  discount: boolean;
+  /** Inside the noise floor: drawn without a direction's colour. */
+  muted?: boolean;
+}) {
   const W = 400;
   const H = 140;
   const data = useMemo(() => (points && points.length > 1 ? (real ? rollingMedian(points, 4) : points) : null), [points, real]);
@@ -420,8 +445,8 @@ function MiniChart({ points, real, discount }: { points: HistoryPoint[] | null; 
     }
   });
   const last = data[data.length - 1];
-  const color = discount ? "#19d18f" : "#ff4d6a";
-  const id = discount ? "mc-cheap" : "mc-rich";
+  const color = muted ? "#9699a6" : discount ? "#19d18f" : "#ff4d6a";
+  const id = muted ? "mc-quiet" : discount ? "mc-cheap" : "mc-rich";
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 h-[140px] w-full overflow-visible" preserveAspectRatio="none" role="img" aria-label="Gap over the last 48 hours">
       <defs>
