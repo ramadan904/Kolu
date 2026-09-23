@@ -245,6 +245,14 @@ endpoint answered, and `/api/health` lists the chain. When a price poll fails
 the board keeps the last prices and says how old they are — "Reconnecting ·
 44s old" — instead of blanking or pretending they are live.
 
+**Verified with real money.** A $4 buy of TSLAX, paid in SOL, on the deployed
+site: [`5YyfS2cs…Me9MhY`](https://solscan.io/tx/5YyfS2csucHcc7e4U1XsrvA3gk8whBLHt5CcEHL1M7ZyBHU1a86NM8K2qxoJWZGzGxn9ZC9XMmLeJ1rNSbMe9MhY).
+Quote → wallet signature → confirmation → **Filled**, 0.033977 SOL for
+0.01058247 TSLAX, plus 0.000124 SOL of network fee and 0.003048 SOL of
+refundable account rent that Kolu excludes from the recorded entry price
+(~$378.70/TSLAX). The rent figure in the ticket was corrected from an estimate
+to that measurement after this trade.
+
 **Verified against live Jupiter:** the trade path. All twelve pairs, both
 directions — quote fetched, parsed by the production adapter, sanity-checked,
 then the real swap transaction built and deserialized as a

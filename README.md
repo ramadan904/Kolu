@@ -175,6 +175,11 @@ moves, the order does not follow. Open orders are listed on *Portfolio*
 with Cancel. Without a wallet, *Dry run* builds and simulates the exact order
 transaction on mainnet.
 
+**Proven with real money.** A $4 TSLAX buy paid in SOL on the deployed site:
+[`5YyfS2cs…`](https://solscan.io/tx/5YyfS2csucHcc7e4U1XsrvA3gk8whBLHt5CcEHL1M7ZyBHU1a86NM8K2qxoJWZGzGxn9ZC9XMmLeJ1rNSbMe9MhY)
+— quote, wallet signature, polled confirmation, *Filled*, and an entry price
+read back from what the transaction actually moved.
+
 **Balance-aware trading.** The ticket reads what you hold; *Max* fills the size.
 A trade larger than your holdings is blocked before it reaches the wallet.
 Quotes older than 10s are refreshed before signing. Confirmation is polled, and

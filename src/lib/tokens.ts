@@ -82,5 +82,9 @@ export const SOL_DECIMALS = 9;
  * small wallet can be traded at all.
  */
 export const SOL_FEE_RESERVE = 0.0025;
-/** Rent deposit for a new Token-2022 account, SOL. Shown before a first buy. */
-export const TOKEN_ACCOUNT_RENT_SOL = 0.0021;
+/**
+ * Rent deposit for a new Token-2022 xStock account, SOL. Measured from a real
+ * first buy (tx 5YyfS2cs…, 0.003048 SOL) rather than estimated — the
+ * extensions these mints carry make the account dearer than a plain one.
+ */
+export const TOKEN_ACCOUNT_RENT_SOL = 0.0031;
