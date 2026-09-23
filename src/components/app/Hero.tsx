@@ -63,6 +63,12 @@ export function Hero({
         <span className="transition-transform group-hover:translate-x-0.5">→</span>
       </button>
     ) : null;
+  const replayPrimary = onReplay ? (
+    <Button size="lg" onClick={onReplay} className="min-w-[260px]">
+      Replay a real dislocation
+      <span aria-hidden="true">→</span>
+    </Button>
+  ) : null;
   const armAction =
     onArmBreakeven && breakevenBps ? (
       pairs > 0 && armedAtBreakeven >= pairs ? (
@@ -106,8 +112,13 @@ export function Hero({
             "Nothing is trading far enough from its real share to be worth the fees. Gaps tend to open as the session ages."
           )}
         </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">{armAction}</div>
-        {replayButton("Quiet right now — replay the widest real gap of the week")}
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          {replayPrimary}
+          {armAction}
+        </div>
+        <p className="mono mt-3 text-[11px] text-[var(--text-3)]">
+          Quiet is the normal state — the replay rebuilds the board from the widest real gap of the week.
+        </p>
         </div>
         {closest && closest.basisBps !== null && (
           <SignalCard
