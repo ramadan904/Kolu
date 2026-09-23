@@ -9,7 +9,7 @@ after costs, and tells you whether it can be hedged or only bet on.
 
 Built for [STOCKLANA](https://hackathons.solana.com/hackathons/stocklana).
 
-**[Open the live board](https://kolu-ramrex904-5914.vercel.app)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
+**[Open the live board](https://kolu-app.vercel.app)** · [Deploy your own](DEPLOY.md) · [QA checklist](QA.md) · [Submission](SUBMISSION.md)
 
 **Four pages, one live board.** *Board* is the market now (the headline gap,
 the map, every pair, alerts). *Portfolio* is your holdings, P&L, orders and

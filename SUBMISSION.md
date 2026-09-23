@@ -275,13 +275,13 @@ so a leftover placeholder is dropped rather than handed to a router.
 
 ## Links
 
-- **Live:** https://kolu-ramrex904-5914.vercel.app
-- **Straight to it:** [replay the week's widest real gap](https://kolu-ramrex904-5914.vercel.app/?replay=1)
+- **Live:** https://kolu-app.vercel.app
+- **Straight to it:** [replay the week's widest real gap](https://kolu-app.vercel.app/?replay=1)
   (the exact moment in the video:
-  [AAPLX +148bps, Sat 19 Sep 06:30 ET](https://kolu-ramrex904-5914.vercel.app/?replay=real&at=1789813800000)
+  [AAPLX +148bps, Sat 19 Sep 06:30 ET](https://kolu-app.vercel.app/?replay=real&at=1789813800000)
   — a moment that has aged out of the window replays the closest one on record and says so) ·
-  [a live portfolio](https://kolu-ramrex904-5914.vercel.app/portfolio?view=example) · [gap history](https://kolu-ramrex904-5914.vercel.app/history) · [the backtest](https://kolu-ramrex904-5914.vercel.app/backtest) · [a TSLAX ticket](https://kolu-ramrex904-5914.vercel.app/?trade=TSLA)
-- **Health:** https://kolu-ramrex904-5914.vercel.app/api/health
+  [a live portfolio](https://kolu-app.vercel.app/portfolio?view=example) · [gap history](https://kolu-app.vercel.app/history) · [the backtest](https://kolu-app.vercel.app/backtest) · [a TSLAX ticket](https://kolu-app.vercel.app/?trade=TSLA)
+- **Health:** https://kolu-app.vercel.app/api/health
 - **GitHub:** https://github.com/ramadan904/Kolu
 - **Run it:** `npm install && npm run dev` — no key, no wallet, no RPC for the board; set `SOLANA_RPC_URL` to trade
 
