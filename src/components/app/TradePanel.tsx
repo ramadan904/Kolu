@@ -23,6 +23,7 @@ import { pollConfirmation } from "@/lib/confirm";
 import { requestBalancesRefresh, useBalances } from "./useBalances";
 import { WalletButton } from "./WalletButton";
 import { LimitOrder } from "./LimitOrder";
+import { PoolDepth } from "./PoolDepth";
 import { useDislocations } from "./useDislocations";
 import { recordFill } from "./useJournal";
 import { convergenceOutlook, untilOpen } from "@/lib/basis/convergence";
@@ -956,6 +957,8 @@ export function TradePanel({
             />
             <Line label="Network fee" value={edge ? `−${edge.breakdown[2].bps.toFixed(1)}bps` : "—"} muted />
           </dl>
+          {/* What the measured impact is actually measuring against. */}
+          <PoolDepth ticker={reading.ticker} notionalUsd={notional} />
           <div className="hairline mt-3 flex items-baseline justify-between pt-3">
             <span className="whitespace-nowrap text-[13px] font-medium">Net edge</span>
             <span className="whitespace-nowrap text-right">
