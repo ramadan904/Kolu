@@ -1163,7 +1163,7 @@ export function TradePanel({
                   : "The gap here is modelled; quotes and costs are live."}{" "}
                 Go back to live prices to trade or dry-run.
               </p>
-            ) : !connected ? (
+            ) : (
               <>
                 {dry.kind === "ok" && (
                   <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--down)]/25 bg-[var(--down-soft)] px-3.5 py-2.5" role="status">
@@ -1189,7 +1189,13 @@ export function TradePanel({
                   </div>
                 )}
                 <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <WalletButton size="lg" full dropUp label="Connect wallet to trade" />
+                  {connected ? (
+                    <Button full size="lg" disabled={!canSwap} loading={busy} onClick={() => void swap()}>
+                      {primaryLabel}
+                    </Button>
+                  ) : (
+                    <WalletButton size="lg" full dropUp label="Connect wallet to trade" />
+                  )}
                   <Button
                     size="lg"
                     variant="secondary"
@@ -1202,10 +1208,6 @@ export function TradePanel({
                   </Button>
                 </div>
               </>
-            ) : (
-              <Button full size="lg" disabled={!canSwap} loading={busy} onClick={() => void swap()}>
-                {primaryLabel}
-              </Button>
             )}
 
             <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-[var(--text-3)]">
