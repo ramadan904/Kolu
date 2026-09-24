@@ -15,7 +15,7 @@ import { fmtAmount } from "@/lib/tokens";
 import { convergenceUsd } from "@/lib/trade";
 import { Spinner } from "@/components/ui/Button";
 import { WalletButton } from "./WalletButton";
-import { useJournal } from "./useJournal";
+import { importFills, useJournal } from "./useJournal";
 import { basisFor, unrealised, type Basis } from "@/lib/journal";
 
 interface Holding {
@@ -117,6 +117,11 @@ export function Portfolio({
   // only for a connected wallet, never a watched address.
   const pnlOwner = !demo && !watching ? owner : null;
   const { disconnect } = useWallet();
+  // The chain remembers fills this browser never saw — a swap made on a phone
+  // should still show an entry price on a laptop.
+  useEffect(() => {
+    if (pnlOwner && activity.items.length > 0) importFills(pnlOwner, activity.items);
+  }, [pnlOwner, activity.items]);
   const { journal, setManual } = useJournal(pnlOwner);
 
   // Every hook above runs on every render; early returns only below this line.
@@ -828,9 +833,11 @@ function PnlCell({
 
   const { usd, pct } = unrealised(basis, price);
   const partial = basis.coveredQty < held - 1e-9;
-  const detail = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% · entry ${fmtUsd(basis.entry)}${
-    basis.source === "manual" ? " (yours)" : ""
-  }${partial ? ` · on ${fmtAmount(basis.coveredQty)} of ${fmtAmount(held)}` : ""}`;
+  const label =
+    basis.source === "manual" ? " (yours)" : basis.source === "chain" ? " (from chain)" : "";
+  const detail = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% · entry ${fmtUsd(basis.entry)}${label}${
+    partial ? ` · on ${fmtAmount(basis.coveredQty)} of ${fmtAmount(held)}` : ""
+  }`;
 
   return inline ? (
     <span className="num flex flex-wrap items-baseline gap-x-2 text-[12px]">
@@ -848,7 +855,9 @@ function PnlCell({
       title={
         basis.source === "kolu"
           ? "From your swaps through Kolu, read back from chain. Click to override with your own entry."
-          : "Your entered entry price. Click to change or clear it."
+          : basis.source === "chain"
+            ? "Read from this wallet's swaps on chain: the trade was paid in SOL, so its value comes from the swap's USDC leg. Click to set your own entry instead."
+            : "Your entered entry price. Click to change or clear it."
       }
     >
       <span style={{ color: pnlColor(usd) }}>{signedUsd(usd)}</span>

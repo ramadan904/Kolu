@@ -68,3 +68,42 @@ describe("journal", () => {
     expect(r.pct).toBeCloseTo(10);
   });
 });
+
+describe("fills imported from chain", () => {
+  it("prices a SOL-paid swap from the route's USDC leg, and says so", async () => {
+    const { fillFromActivity } = await import("@/components/app/useJournal");
+    const fill = fillFromActivity({
+      signature: "sig",
+      time: 1_700_000_000,
+      kind: "received",
+      tokenTicker: "TSLAX",
+      tokenAmount: 0.01058247,
+      usdcAmount: null,
+      routeUsdcAmount: 4.007407,
+      failed: false,
+    });
+    expect(fill).toMatchObject({ ticker: "TSLA", side: "buy", tokenAmount: 0.01058247, usdcAmount: 4.007407, priced: "chain" });
+  });
+
+  it("prefers the wallet's own USDC when it moved", async () => {
+    const { fillFromActivity } = await import("@/components/app/useJournal");
+    const fill = fillFromActivity({
+      signature: "sig2",
+      time: 1_700_000_000,
+      kind: "bought",
+      tokenTicker: "NVDAX",
+      tokenAmount: 1,
+      usdcAmount: 226.45,
+      routeUsdcAmount: 226.45,
+      failed: false,
+    });
+    expect(fill).toMatchObject({ usdcAmount: 226.45, priced: "kolu" });
+  });
+
+  it("ignores plain transfers and failed transactions", async () => {
+    const { fillFromActivity } = await import("@/components/app/useJournal");
+    const base = { signature: "s", time: 1, tokenTicker: "TSLAX", tokenAmount: 1, usdcAmount: null, routeUsdcAmount: null, failed: false } as const;
+    expect(fillFromActivity({ ...base, kind: "received" })).toBeNull();
+    expect(fillFromActivity({ ...base, kind: "bought", usdcAmount: 10, failed: true })).toBeNull();
+  });
+});

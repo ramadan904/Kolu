@@ -19,6 +19,13 @@ export interface Activity {
   tokenAmount: number;
   /** USDC on the other side of a swap; null for a plain transfer. */
   usdcAmount: number | null;
+  /**
+   * The largest USDC movement anywhere in the transaction, including hops the
+   * wallet never touched. A swap paid in SOL usually routes through USDC, and
+   * that leg is what the trade was worth at the moment it executed — the only
+   * exact dollar figure such a transaction carries.
+   */
+  routeUsdcAmount: number | null;
   failed: boolean;
 }
 
@@ -83,6 +90,22 @@ export function classify(
   if (!subject) return null;
 
   const usdc = usdcMint ? (d.get(usdcMint) ?? 0) : 0;
+  // Every USDC account in the transaction, not only the wallet's own.
+  let routeUsdc = 0;
+  if (usdcMint) {
+    const byAccount = new Map<number, number>();
+    for (const b of tx.meta?.preTokenBalances ?? []) {
+      if (b.mint === usdcMint && b.accountIndex !== undefined) {
+        byAccount.set(b.accountIndex, (byAccount.get(b.accountIndex) ?? 0) - amountOf(b));
+      }
+    }
+    for (const b of tx.meta?.postTokenBalances ?? []) {
+      if (b.mint === usdcMint && b.accountIndex !== undefined) {
+        byAccount.set(b.accountIndex, (byAccount.get(b.accountIndex) ?? 0) + amountOf(b));
+      }
+    }
+    for (const change of byAccount.values()) routeUsdc = Math.max(routeUsdc, Math.abs(change));
+  }
   const swapped =
     (subject.change > 0 && usdc < -DUST) || (subject.change < 0 && usdc > DUST);
 
@@ -99,6 +122,7 @@ export function classify(
     tokenTicker: tokens[subject.mint],
     tokenAmount: Math.abs(subject.change),
     usdcAmount: swapped ? Math.abs(usdc) : null,
+    routeUsdcAmount: routeUsdc > 0 ? routeUsdc : null,
     failed: tx.meta?.err != null,
   };
 }

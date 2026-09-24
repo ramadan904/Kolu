@@ -12,6 +12,13 @@
 
 export interface Fill {
   signature: string;
+  /**
+   * How the dollar value was established. "kolu": the wallet's own USDC moved,
+   * so it is exact. "chain": the swap was paid in something else and routed
+   * through USDC — that leg is the trade's value at execution, read from the
+   * transaction but one step removed from the wallet.
+   */
+  priced?: "kolu" | "chain";
   /** Unix ms. */
   t: number;
   /** Underlying ticker, e.g. "TSLA". */
@@ -38,7 +45,7 @@ export interface Basis {
   entry: number;
   /** Units covered: every unit held for a manual entry, else what Kolu fills account for. */
   coveredQty: number;
-  source: "kolu" | "manual";
+  source: "kolu" | "manual" | "chain";
 }
 
 const EMPTY: Journal = { fills: [], manual: {} };
@@ -124,9 +131,13 @@ export function basisFor(journal: Journal, ticker: string, heldQty: number): Bas
   if (heldQty <= DUST) return null;
   const manual = journal.manual[ticker];
   if (manual) return { entry: manual.price, coveredQty: heldQty, source: "manual" };
-  const avg = averageCost(journal.fills.filter((f) => f.ticker === ticker));
+  const mine = journal.fills.filter((f) => f.ticker === ticker);
+  const avg = averageCost(mine);
   if (!avg) return null;
-  return { entry: avg.entry, coveredQty: Math.min(avg.qty, heldQty), source: "kolu" };
+  // If any covering fill was priced from the route rather than the wallet's
+  // own USDC, say so rather than implying an exact figure.
+  const source = mine.some((f) => f.priced === "chain") ? "chain" : "kolu";
+  return { entry: avg.entry, coveredQty: Math.min(avg.qty, heldQty), source };
 }
 
 /** Unrealised P&L on the covered units at `price`, in USD and percent of cost. */
